@@ -771,13 +771,13 @@ if (typeof document !== 'undefined') {
         let auth0Client = null;
 
         const initAuth0 = async () => {
-            const domain = typeof AUTH0_DOMAIN !== 'undefined' ? AUTH0_DOMAIN : 'your-tenant.us.auth0.com';
-            const clientId = typeof AUTH0_CLIENT_ID !== 'undefined' ? AUTH0_CLIENT_ID : 'your-client-id';
+            
+
 
             try {
-                auth0Client = await createAuth0Client({
-                    domain: domain,
-                    client_id: clientId,
+                auth0Client = await auth0.createAuth0Client({
+                    domain: AUTH0_DOMAIN,
+                    client_id: AUTH0_CLIENT_ID,
                     authorizationParams: {
                         redirect_uri: window.location.origin + window.location.pathname
                     }
