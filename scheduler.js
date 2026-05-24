@@ -245,6 +245,7 @@ if (typeof document !== 'undefined') {
             currentMonth: new Date().getMonth(),
             destination: "japan",
             activeUser: "Alice",
+            auth0User: null,
             expenses: [],
             icCards: {
                 Alice: { JPY: 2000, MYR: 50, CNY: 100, logs: [] },
@@ -357,6 +358,12 @@ if (typeof document !== 'undefined') {
         const authRoleSelect = document.getElementById("auth-role");
         const authCancelBtn = document.getElementById("auth-cancel-btn");
         const syncStatusBadge = document.getElementById("sync-status");
+        
+        // Auth0 elements
+        const auth0LoginBtn = document.getElementById("auth0-login-btn");
+        const auth0LogoutBtn = document.getElementById("auth0-logout-btn");
+        const auth0ProfileDiv = document.getElementById("auth0-profile");
+        const auth0UserAvatar = document.getElementById("auth0-user-avatar");
         
         // Transit
         const transitTitle = document.getElementById("transit-title");
@@ -752,6 +759,80 @@ if (typeof document !== 'undefined') {
             expensePayerSelect.value = state.mappedRole;
         }
 
+        // -------------------------------------------------------------------------
+        // AUTH0 OAUTH 2.0 PKCE SECURITY FLOW
+        // -------------------------------------------------------------------------
+        let auth0Client = null;
+
+        const initAuth0 = async () => {
+            const domain = typeof AUTH0_DOMAIN !== 'undefined' ? AUTH0_DOMAIN : 'your-tenant.us.auth0.com';
+            const clientId = typeof AUTH0_CLIENT_ID !== 'undefined' ? AUTH0_CLIENT_ID : 'your-client-id';
+
+            try {
+                auth0Client = await createAuth0Client({
+                    domain: domain,
+                    client_id: clientId,
+                    authorizationParams: {
+                        redirect_uri: window.location.origin + window.location.pathname
+                    }
+                });
+
+                // Handle Auth0 Redirect Callback if returning from sign-in
+                const query = window.location.search;
+                if (query.includes("code=") && query.includes("state=")) {
+                    await auth0Client.handleRedirectCallback();
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+
+                await updateAuth0StateUI();
+            } catch (err) {
+                console.warn("Auth0 initialization failed. Using Guest fallback.", err);
+            }
+        };
+
+        const updateAuth0StateUI = async () => {
+            if (!auth0Client) return;
+
+            const isAuthenticated = await auth0Client.isAuthenticated();
+
+            if (isAuthenticated) {
+                const user = await auth0Client.getUser();
+                state.auth0User = user;
+
+                // Sync Auth0 profile name to RoamReady state
+                state.activeUser = user.nickname || user.name || "AuthUser";
+                localStorage.setItem("travelActiveUser", state.activeUser);
+
+                auth0LoginBtn.style.display = "none";
+                auth0ProfileDiv.style.display = "flex";
+                auth0UserAvatar.src = user.picture || "";
+                
+                updateProfileUI();
+            } else {
+                state.auth0User = null;
+                auth0LoginBtn.style.display = "inline-flex";
+                auth0ProfileDiv.style.display = "none";
+            }
+        };
+
+        auth0LoginBtn.addEventListener("click", async () => {
+            if (!auth0Client) {
+                alert("Auth0 failed to initialize. Please verify config.js settings.");
+                return;
+            }
+            await auth0Client.loginWithRedirect();
+        });
+
+        auth0LogoutBtn.addEventListener("click", async () => {
+            if (!auth0Client) return;
+            state.auth0User = null;
+            await auth0Client.logout({
+                logoutParams: {
+                    returnTo: window.location.origin + window.location.pathname
+                }
+            });
+        });
+
         icPassengerSelect.addEventListener("change", (e) => {
             state.mappedRole = e.target.value;
             localStorage.setItem("travelMappedRole", state.mappedRole);
@@ -1020,6 +1101,12 @@ if (typeof document !== 'undefined') {
         // Shared Ledger Form Submit
         expenseForm.addEventListener("submit", (e) => {
             e.preventDefault();
+
+            // Protect the Shared Wallet: require Auth0 login to add expenses
+            if (!state.auth0User) {
+                alert("🔒 Authentication Required: You must log in via Auth0 to add expenses to the group wallet.");
+                return;
+            }
             const title = expenseTitleInput.value;
             const type = expenseTypeSelect.value;
             const category = expenseCategoryInput.value;
@@ -1319,6 +1406,9 @@ if (typeof document !== 'undefined') {
         fetchPlacesDb();
         renderLedger();
         renderDebtSettlement();
+
+        // Initialize Auth0 PKCE Security
+        initAuth0();
 
         // Auto-show login signup screen on very first launch
         if (state.activeUser === "Guest") {

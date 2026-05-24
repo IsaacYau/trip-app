@@ -11,6 +11,9 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="scheduler.css">
+    <!-- Auth0 Config & SDK -->
+    <script src="config.js"></script>
+    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
 </head>
 <body>
     <!-- Premium Top Bar -->
@@ -30,6 +33,20 @@
                     <i data-lucide="user" style="width:12px; height:12px;"></i>
                     <span id="current-user-display">Sign In</span>
                 </button>
+            </div>
+            <!-- Auth0 Security Panel -->
+            <div id="auth0-section" class="header-select-group" style="display: flex; align-items: center; gap: 0.4rem;">
+                <button type="button" id="auth0-login-btn" class="header-select profile-badge-btn" style="display: flex; align-items: center; gap: 0.25rem; background-color: var(--accent); color: #ffffff; border-color: var(--accent); font-weight: 800;">
+                    <i data-lucide="log-in" style="width:12px; height:12px;"></i>
+                    <span>Login</span>
+                </button>
+                <div id="auth0-profile" style="display: none; align-items: center; gap: 0.4rem;">
+                    <img id="auth0-user-avatar" src="" alt="Avatar" style="width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--accent); flex-shrink: 0; background-color: var(--border);">
+                    <button type="button" id="auth0-logout-btn" class="header-select profile-badge-btn" style="display: flex; align-items: center; gap: 0.25rem; font-weight: 800; border-color: var(--danger); color: var(--danger);">
+                        <i data-lucide="log-out" style="width:12px; height:12px;"></i>
+                        <span>Logout</span>
+                    </button>
+                </div>
             </div>
             <div class="sync-badge" id="sync-status" title="Collaborative Live Sync">
                 <span class="sync-dot blinking"></span>
