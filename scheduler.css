@@ -85,12 +85,20 @@ body {
     font-weight: 700;
     font-size: 1.25rem;
     color: var(--accent);
+    flex-shrink: 0;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 .logo-icon {
     width: 24px;
     height: 24px;
     stroke-width: 2.5px;
+    flex-shrink: 0;
 }
 
 .icon-btn {
@@ -269,6 +277,20 @@ body {
 }
 
 @media (max-width: 768px) {
+    .app-header {
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: center;
+        padding: 0.75rem 1rem;
+    }
+    
+    .header-actions {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    
     .scheduler-grid {
         grid-template-columns: 1fr;
     }

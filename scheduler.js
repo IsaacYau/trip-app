@@ -275,9 +275,18 @@ if (typeof document !== 'undefined') {
             state.destination = localStorage.getItem("travelDestination") || "japan";
             document.getElementById("destination-select").value = state.destination;
 
-            state.activeUser = localStorage.getItem("travelActiveUser") || "Alice";
-            document.getElementById("user-select").value = state.activeUser;
-            document.getElementById("ic-passenger").value = state.activeUser;
+            state.activeUser = localStorage.getItem("travelActiveUser") || "";
+            state.groupCode = localStorage.getItem("travelGroupCode") || "";
+            state.mappedRole = localStorage.getItem("travelMappedRole") || "";
+
+            const firstTime = !state.activeUser || !state.groupCode || !state.mappedRole;
+            if (firstTime) {
+                state.activeUser = "Guest";
+                state.groupCode = "TRIP-2026";
+                state.mappedRole = "Alice";
+            }
+            
+            document.getElementById("ic-passenger").value = state.mappedRole;
 
             const storedExpenses = localStorage.getItem("travelExpenses");
             if (storedExpenses) {
@@ -338,9 +347,15 @@ if (typeof document !== 'undefined') {
         const toastBody = document.getElementById("toast-body");
         const closeToastBtn = document.getElementById("close-toast");
 
-        // Selectors
         const destSelect = document.getElementById("destination-select");
-        const userSelect = document.getElementById("user-select");
+        const profileBadgeBtn = document.getElementById("profile-badge-btn");
+        const currentUserDisplay = document.getElementById("current-user-display");
+        const authModal = document.getElementById("auth-modal");
+        const authForm = document.getElementById("auth-form");
+        const authUsernameInput = document.getElementById("auth-username");
+        const authGroupInput = document.getElementById("auth-group");
+        const authRoleSelect = document.getElementById("auth-role");
+        const authCancelBtn = document.getElementById("auth-cancel-btn");
         const syncStatusBadge = document.getElementById("sync-status");
         
         // Transit
@@ -392,6 +407,8 @@ if (typeof document !== 'undefined') {
         const icTopupNeeded = document.getElementById("ic-topup-needed");
 
         // Theme Toggle
+        const storedTheme = localStorage.getItem("theme") || "light";
+        document.documentElement.setAttribute("data-theme", storedTheme);
         updateThemeIcon(storedTheme);
         themeToggleBtn.addEventListener("click", () => {
             const currentTheme = document.documentElement.getAttribute("data-theme");
@@ -644,17 +661,101 @@ if (typeof document !== 'undefined') {
             saveICCardsToStorage();
         });
 
-        userSelect.addEventListener("change", (e) => {
-            state.activeUser = e.target.value;
-            localStorage.setItem("travelActiveUser", state.activeUser);
-            icPassengerSelect.value = state.activeUser;
-            updateIcEstimator();
+        // -------------------------------------------------------------------------
+        // CALENDAR MONTH NAVIGATION
+        // -------------------------------------------------------------------------
+        document.getElementById("prev-month").addEventListener("click", () => {
+            state.currentMonth--;
+            if (state.currentMonth < 0) {
+                state.currentMonth = 11;
+                state.currentYear--;
+            }
+            generateCalendar();
+        });
+        
+        document.getElementById("next-month").addEventListener("click", () => {
+            state.currentMonth++;
+            if (state.currentMonth > 11) {
+                state.currentMonth = 0;
+                state.currentYear++;
+            }
+            generateCalendar();
         });
 
+        // -------------------------------------------------------------------------
+        // PROFILE SIGNUP / LOGIN / ACCOUNT MANAGEMENT
+        // -------------------------------------------------------------------------
+        let authModalRequired = false;
+
+        function openAuthModal(required = false) {
+            authModalRequired = required;
+            
+            if (state.activeUser === "Guest") {
+                authUsernameInput.value = "";
+                authGroupInput.value = "";
+            } else {
+                authUsernameInput.value = state.activeUser || "";
+                authGroupInput.value = state.groupCode || "";
+            }
+            
+            authRoleSelect.value = state.mappedRole || "Alice";
+            
+            if (required) {
+                authCancelBtn.style.display = "none";
+            } else {
+                authCancelBtn.style.display = "inline-block";
+            }
+            authModal.style.display = "flex";
+        }
+
+        function closeAuthModal() {
+            authModal.style.display = "none";
+        }
+
+        authForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const username = authUsernameInput.value.trim();
+            const group = authGroupInput.value.trim();
+            const role = authRoleSelect.value;
+
+            if (username && group && role) {
+                state.activeUser = username;
+                state.groupCode = group;
+                state.mappedRole = role;
+
+                localStorage.setItem("travelActiveUser", username);
+                localStorage.setItem("travelGroupCode", group);
+                localStorage.setItem("travelMappedRole", role);
+
+                updateProfileUI();
+                closeAuthModal();
+                
+                renderLedger();
+                renderDebtSettlement();
+                updateIcEstimator();
+                glowSyncBadge();
+            }
+        });
+
+        authCancelBtn.addEventListener("click", () => {
+            if (!authModalRequired) closeAuthModal();
+        });
+
+        profileBadgeBtn.addEventListener("click", () => {
+            openAuthModal(false);
+        });
+
+        function updateProfileUI() {
+            currentUserDisplay.innerHTML = `<span style="font-weight: 800; color: var(--accent);">${state.activeUser}</span> <span style="font-size:0.65rem; color:var(--text-secondary); background:var(--border); padding:0.15rem 0.3rem; border-radius:3px; margin-left:0.25rem;">${state.groupCode}</span>`;
+            
+            icPassengerSelect.value = state.mappedRole;
+            expensePayerSelect.value = state.mappedRole;
+        }
+
         icPassengerSelect.addEventListener("change", (e) => {
-            state.activeUser = e.target.value;
-            localStorage.setItem("travelActiveUser", state.activeUser);
-            userSelect.value = state.activeUser;
+            state.mappedRole = e.target.value;
+            localStorage.setItem("travelMappedRole", state.mappedRole);
+            updateProfileUI();
             updateIcEstimator();
         });
 
@@ -1212,11 +1313,17 @@ if (typeof document !== 'undefined') {
 
         // Bootstrap load
         loadAllData();
+        updateProfileUI();
         generateCalendar();
         updateDestinationUI();
         fetchPlacesDb();
         renderLedger();
         renderDebtSettlement();
+
+        // Auto-show login signup screen on very first launch
+        if (state.activeUser === "Guest") {
+            openAuthModal(true);
+        }
     });
 }
 

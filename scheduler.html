@@ -26,11 +26,10 @@
                     <option value="china">🇨🇳 China (Shenzhen)</option>
                     <option value="malaysia">🇲🇾 Malaysia (KL/Penang)</option>
                 </select>
-                <select id="user-select" class="header-select" title="Active User">
-                    <option value="Alice">👩‍🦰 Alice</option>
-                    <option value="Bob">👨‍🦱 Bob</option>
-                    <option value="Charlie">👦 Charlie</option>
-                </select>
+                <button id="profile-badge-btn" class="header-select profile-badge-btn" title="Manage Account & Group" style="display:flex; align-items:center; gap:0.25rem;">
+                    <i data-lucide="user" style="width:12px; height:12px;"></i>
+                    <span id="current-user-display">Sign In</span>
+                </button>
             </div>
             <div class="sync-badge" id="sync-status" title="Collaborative Live Sync">
                 <span class="sync-dot blinking"></span>
@@ -66,8 +65,10 @@
                 <div class="calendar-card card">
                     <div class="card-header">
                         <h3 class="card-title"><i data-lucide="calendar"></i> Travel Calendar</h3>
-                        <div class="month-selector">
-                            <span id="current-month-year">May 2026</span>
+                        <div class="month-selector" style="display:flex; align-items:center; gap:0.4rem;">
+                            <button type="button" id="prev-month" class="icon-btn-sm" title="Previous Month" style="padding:0; border:1px solid var(--border); background:none; border-radius:var(--radius-sm); cursor:pointer; width:24px; height:24px; display:flex; align-items:center; justify-content:center; color:var(--text-primary); transition:var(--transition);"><i data-lucide="chevron-left" style="width:12px; height:12px;"></i></button>
+                            <span id="current-month-year" style="font-weight:750; font-family:var(--font-heading); min-width:85px; text-align:center;">May 2026</span>
+                            <button type="button" id="next-month" class="icon-btn-sm" title="Next Month" style="padding:0; border:1px solid var(--border); background:none; border-radius:var(--radius-sm); cursor:pointer; width:24px; height:24px; display:flex; align-items:center; justify-content:center; color:var(--text-primary); transition:var(--transition);"><i data-lucide="chevron-right" style="width:12px; height:12px;"></i></button>
                         </div>
                     </div>
                     <div id="calendar"></div>
@@ -458,6 +459,42 @@
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" id="cancel-modal">Cancel</button>
                     <button type="submit" class="btn btn-accent" id="save-activity-btn">Save Activity</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Signup / Login Modal -->
+    <div id="auth-modal" class="modal-overlay">
+        <div class="modal-container" style="max-width: 400px; padding: 1.5rem;">
+            <div class="modal-header" style="border-bottom: 2px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="auth-modal-title" style="font-family: var(--font-heading); font-weight: 800; font-size: 1.25rem; display: flex; align-items: center; gap: 0.35rem;">
+                    <i data-lucide="key" style="width:18px; height:18px; color:var(--accent);"></i> Access RoamReady
+                </h3>
+            </div>
+            <form id="auth-form" class="modal-form">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="auth-username" style="display: block; font-size: 0.75rem; font-weight: 750; margin-bottom: 0.35rem;">Your Name *</label>
+                    <input type="text" id="auth-username" placeholder="e.g. Isaac" required style="width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-primary); font-size: 0.85rem;" autocomplete="off">
+                </div>
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="auth-group" style="display: block; font-size: 0.75rem; font-weight: 750; margin-bottom: 0.35rem;">Group / Trip Code *</label>
+                    <input type="text" id="auth-group" placeholder="e.g. HK-GANG-2026" required style="width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-primary); font-size: 0.85rem;" autocomplete="off">
+                </div>
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label for="auth-role" style="display: block; font-size: 0.75rem; font-weight: 750; margin-bottom: 0.35rem;">Map to Wallet Account Identity</label>
+                    <select id="auth-role" required style="width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-primary); font-size: 0.85rem; font-weight: 600; cursor: pointer; outline: none; background-color: var(--bg-primary);">
+                        <option value="Alice">👩‍🦰 Alice (Persona 1)</option>
+                        <option value="Bob">👨‍🦱 Bob (Persona 2)</option>
+                        <option value="Charlie">👦 Charlie (Persona 3)</option>
+                    </select>
+                    <p style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 0.4rem; line-height: 1.4;">
+                        To sync group expenses and map payments in debt settlements, choose one of the three active trip ledger roles.
+                    </p>
+                </div>
+                <div class="modal-actions" style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" id="auth-cancel-btn" style="flex: 1; display: none;">Cancel</button>
+                    <button type="submit" class="btn btn-accent" style="flex: 2;">Enter Group Trip</button>
                 </div>
             </form>
         </div>
