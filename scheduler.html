@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoamReady - Travel Assistant</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="scheduler.css">
+</head>
+<body>
+    <!-- Premium Top Bar -->
+    <header class="app-header">
+        <div class="logo">
+            <i class="logo-icon" data-lucide="compass"></i>
+            <span>RoamReady</span>
+        </div>
+        <div class="header-actions">
+            <div class="header-select-group">
+                <select id="destination-select" class="header-select" title="Choose Destination">
+                    <option value="japan">🇯🇵 Japan (Nagoya/Osaka/Kobe)</option>
+                    <option value="china">🇨🇳 China (Shenzhen)</option>
+                    <option value="malaysia">🇲🇾 Malaysia (KL/Penang)</option>
+                </select>
+                <select id="user-select" class="header-select" title="Active User">
+                    <option value="Alice">👩‍🦰 Alice</option>
+                    <option value="Bob">👨‍🦱 Bob</option>
+                    <option value="Charlie">👦 Charlie</option>
+                </select>
+            </div>
+            <div class="sync-badge" id="sync-status" title="Collaborative Live Sync">
+                <span class="sync-dot blinking"></span>
+                <span class="sync-text">Live Sync</span>
+            </div>
+            <button id="theme-toggle" class="icon-btn" title="Toggle Theme">
+                <i data-lucide="moon"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Containers (SPA Sections) -->
+    <main class="app-container">
+        <!-- 1. TRAVEL SCHEDULER SECTION -->
+        <section id="scheduler-section" class="tab-content active">
+            <div class="section-header">
+                <div>
+                    <h2>Interactive Travel Scheduler</h2>
+                    <p class="subtitle">Plan your journey step-by-step and manage reminders.</p>
+                </div>
+                <div class="action-row">
+                    <button id="save-schedule" class="btn btn-primary">
+                        <i data-lucide="save"></i> Save Plan
+                    </button>
+                    <button id="load-schedule" class="btn btn-secondary">
+                        <i data-lucide="download"></i> Load Saved
+                    </button>
+                </div>
+            </div>
+
+            <div class="scheduler-grid">
+                <!-- Left panel: Calendar & Day Selection -->
+                <div class="calendar-card card">
+                    <div class="card-header">
+                        <h3 class="card-title"><i data-lucide="calendar"></i> Travel Calendar</h3>
+                        <div class="month-selector">
+                            <span id="current-month-year">May 2026</span>
+                        </div>
+                    </div>
+                    <div id="calendar"></div>
+                </div>
+
+                <!-- Right panel: Selected Day Details -->
+                <div class="details-card card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i data-lucide="map-pin"></i> 
+                            Day Details: <span id="selected-day-label">Select a day</span>
+                        </h3>
+                        <button id="add-activity-btn" class="btn btn-sm btn-accent" disabled>
+                            <i data-lucide="plus"></i> Add Activity
+                        </button>
+                    </div>
+                    <div id="place-info" class="place-info-body">
+                        <div class="empty-state">
+                            <i data-lucide="calendar-days" class="empty-icon"></i>
+                            <p>Click on any date in the calendar to view, add, or edit your travel activities.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. SUBWAY & TRANSIT OPTIMIZER SECTION -->
+        <section id="subway-section" class="tab-content">
+            <div class="section-header">
+                <div>
+                    <h2 id="transit-title">Subway Node Optimizer</h2>
+                    <p class="subtitle" id="transit-subtitle">Calculate the fastest route and optimize subway transitions.</p>
+                </div>
+            </div>
+            
+            <div id="transit-container" class="transit-grid">
+                <!-- Transit Form -->
+                <div class="card transit-card">
+                    <div class="card-header">
+                        <h3 class="card-title" id="transit-card-title"><i data-lucide="git-fork"></i> Route Planner</h3>
+                    </div>
+                    <form id="transit-form" class="modal-form">
+                        <div class="form-group">
+                            <label for="transit-start">Start Station</label>
+                            <select id="transit-start" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="transit-end">End Station</label>
+                            <select id="transit-end" required></select>
+                        </div>
+                        
+                        <div class="form-group" id="transit-criteria-container">
+                            <label for="transit-criteria">Optimization Criteria</label>
+                            <div class="toggle-switch-container">
+                                <select id="transit-criteria">
+                                    <option value="time">Fastest Travel Time</option>
+                                    <option value="transfers">Fewest Line Transfers</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Taxi Fare Estimator for Shenzhen -->
+                        <div class="form-group" id="taxi-type-container" style="display: none;">
+                            <label for="taxi-type">Didi Car Class</label>
+                            <select id="taxi-type">
+                                <option value="express">🚗 Didi Express (Standard)</option>
+                                <option value="premier">🚘 Didi Premier (Comfort)</option>
+                                <option value="luxe">luxury Didi Luxe (Premium)</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" id="transit-calc-btn" class="btn btn-primary btn-block">
+                            <i data-lucide="navigation"></i> Calculate Route
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Transit Results -->
+                <div class="card transit-results-card">
+                    <div class="card-header">
+                        <h3 class="card-title"><i data-lucide="info"></i> Route Details</h3>
+                    </div>
+                    <div id="transit-results-body" class="transit-results-body">
+                        <div class="empty-state">
+                            <i data-lucide="map" class="empty-icon"></i>
+                            <p>Select stations and calculate to view the optimized itinerary details and fare estimations.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. NEARBY PLACES SECTION -->
+        <section id="places-section" class="tab-content">
+            <div class="section-header">
+                <div>
+                    <h2>Nearby Popular Places</h2>
+                    <p class="subtitle">Explore popular diners, cafes, and sights in your area.</p>
+                </div>
+                <div class="action-row">
+                    <button id="gps-discover-btn" class="btn btn-accent">
+                        <i data-lucide="compass"></i> Find Nearby Gems (GPS)
+                    </button>
+                </div>
+            </div>
+            
+            <div class="places-filters-container card">
+                <div class="places-search-bar">
+                    <i data-lucide="search" class="search-icon"></i>
+                    <input type="text" id="places-search" placeholder="Search by name, category or city..." autocomplete="off">
+                </div>
+                <div class="places-filters-row">
+                    <div class="filter-group">
+                        <label for="places-city-select">Select City</label>
+                        <select id="places-city-select"></select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Category Filter</label>
+                        <div class="category-chips">
+                            <button class="chip active" data-category="All">All</button>
+                            <button class="chip" data-category="Food">Food</button>
+                            <button class="chip" data-category="Sights">Sights</button>
+                            <button class="chip" data-category="Shopping">Shopping</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="gps-status-bar" class="gps-status-bar" style="display: none;">
+                    <i data-lucide="map-pin"></i>
+                    <span id="gps-status-text">GPS Coordinates: -</span>
+                </div>
+            </div>
+
+            <!-- GPS Discovery Results Headings -->
+            <div id="gps-recommendations-header" style="display: none; margin: 1.5rem 0 0.5rem 0;">
+                <h3 style="font-family: var(--font-heading); display: flex; align-items: center; gap: 0.5rem; color: var(--accent);">
+                    <i data-lucide="sparkles"></i> 📍 Right Next To You (Closest 3 Gems)
+                </h3>
+            </div>
+            <div id="gps-recommendations" class="places-grid" style="display: none; margin-bottom: 2rem;"></div>
+
+            <!-- Main places header -->
+            <div id="main-places-header" style="margin: 1.5rem 0 0.5rem 0;">
+                <h3 style="font-family: var(--font-heading);"><i data-lucide="list"></i> All Curated Places</h3>
+            </div>
+            
+            <div id="places-grid" class="places-grid">
+                <div class="empty-state">
+                    <i data-lucide="search" class="empty-icon"></i>
+                    <p>Loading curated local guide database...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. WALLET & ESTIMATOR SECTION -->
+        <section id="wallet-section" class="tab-content">
+            <div class="section-header">
+                <div>
+                    <h2>Shared Wallet & IC Card Estimator</h2>
+                    <p class="subtitle">Track cooperative expenses in HKD and estimate transit card top-ups.</p>
+                </div>
+                <div class="action-row">
+                    <button id="simulate-sync-btn" class="btn btn-secondary btn-sm">
+                        <i data-lucide="refresh-cw"></i> Simulate Friend Edit
+                    </button>
+                </div>
+            </div>
+
+            <div class="wallet-grid">
+                <!-- Left panel: Shared Ledger (HKD Base) -->
+                <div class="card wallet-ledger-card">
+                    <div class="card-header">
+                        <h3 class="card-title"><i data-lucide="wallet"></i> Trip Expenses Ledger</h3>
+                        <span class="wallet-currency-badge">Base: HKD ($)</span>
+                    </div>
+
+                    <!-- Add Expense Form -->
+                    <form id="expense-form" class="expense-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="expense-title">Expense Title *</label>
+                                <input type="text" id="expense-title" placeholder="e.g. Sushi Dinner" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="expense-category">Category</label>
+                                <select id="expense-category">
+                                    <option value="Food">🍔 Food</option>
+                                    <option value="Sights">🎟️ Tickets / Sights</option>
+                                    <option value="Transport">🚇 Transport</option>
+                                    <option value="Shopping">🛍️ Shopping</option>
+                                    <option value="Other">📦 Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row-three">
+                            <div class="form-group">
+                                <label for="expense-amount">Amount *</label>
+                                <input type="number" id="expense-amount" step="0.01" min="0.01" placeholder="0.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="expense-currency">Currency</label>
+                                <select id="expense-currency">
+                                    <option value="HKD">HKD ($)</option>
+                                    <option value="JPY">JPY (¥)</option>
+                                    <option value="CNY">CNY (¥)</option>
+                                    <option value="MYR">MYR (RM)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="expense-payer">Paid By</label>
+                                <select id="expense-payer">
+                                    <option value="Alice">Alice</option>
+                                    <option value="Bob">Bob</option>
+                                    <option value="Charlie">Charlie</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="converted-indicator-row">
+                            <span id="expense-converted-text">Converted: HKD $0.00</span>
+                        </div>
+
+                        <button type="submit" class="btn btn-accent btn-block">
+                            <i data-lucide="plus"></i> Add Expense
+                        </button>
+                    </form>
+
+                    <!-- Expenses List -->
+                    <div id="expenses-list" class="expenses-list">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <!-- Debt Settlements -->
+                    <div class="debt-settlements-container">
+                        <div class="debt-header">
+                            <h4><i data-lucide="arrow-right-left"></i> Shared Settle Up Summary (HKD)</h4>
+                        </div>
+                        <div id="debt-list" class="debt-list">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right panel: IC Card / Transit Estimator -->
+                <div class="card ic-card-estimator-card">
+                    <div class="card-header">
+                        <h3 class="card-title"><i data-lucide="credit-card"></i> Transit Card Estimator</h3>
+                    </div>
+
+                    <div class="ic-passenger-select">
+                        <label for="ic-passenger">Select Passenger</label>
+                        <select id="ic-passenger">
+                            <option value="Alice">Alice</option>
+                            <option value="Bob">Bob</option>
+                            <option value="Charlie">Charlie</option>
+                        </select>
+                    </div>
+
+                    <!-- Realistic CSS Transit Card -->
+                    <div id="transit-card-skin" class="transit-card-skin suica-skin">
+                        <div class="card-chip"></div>
+                        <div class="card-logo" id="ic-card-logo">Suica</div>
+                        <div class="card-holder" id="ic-card-holder">ALICE</div>
+                        <div class="card-balance-section">
+                            <div class="card-balance-label">CARD BALANCE</div>
+                            <div class="card-balance" id="ic-card-balance">¥0</div>
+                        </div>
+                        <div class="card-network" id="ic-card-network">Nagoya-Osaka-Kobe IC</div>
+                    </div>
+
+                    <!-- Card Actions -->
+                    <div class="ic-actions">
+                        <div class="ic-recharge-title">Recharge Simulator (Local Currency)</div>
+                        <div class="recharge-buttons" id="ic-recharge-row">
+                            <!-- Populated by JS based on current destination -->
+                        </div>
+                    </div>
+
+                    <!-- Transit Logs -->
+                    <div class="transit-logs-container">
+                        <h4><i data-lucide="list-todo"></i> Plan Transit Trips Log</h4>
+                        <div id="ic-transit-logs" class="ic-transit-logs">
+                            <!-- Populated by JS -->
+                        </div>
+                        <div class="ic-summary-row">
+                            <span>Estimated Trips Fare:</span>
+                            <strong id="ic-estimated-fare">¥0</strong>
+                        </div>
+                        <div class="ic-summary-row highlight-alert">
+                            <span>Top-up Needed:</span>
+                            <strong id="ic-topup-needed">¥0 (HK$0.00)</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    </main>
+
+    <!-- Bottom Navigation Bar (Mobile Friendly) -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" data-tab="scheduler-section">
+            <i data-lucide="calendar"></i>
+            <span>Scheduler</span>
+        </button>
+        <button class="nav-item" data-tab="subway-section">
+            <i data-lucide="git-fork"></i>
+            <span>Optimizer</span>
+        </button>
+        <button class="nav-item" data-tab="places-section">
+            <i data-lucide="search"></i>
+            <span>Places</span>
+        </button>
+        <button class="nav-item" data-tab="wallet-section">
+            <i data-lucide="wallet"></i>
+            <span>Wallet</span>
+        </button>
+    </nav>
+
+    <!-- Custom Modal for Adding / Editing Activities -->
+    <div id="activity-modal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 id="modal-title">Add Activity</h3>
+                <button class="close-modal-btn" id="close-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="activity-form" class="modal-form">
+                <input type="hidden" id="modal-day">
+                <input type="hidden" id="modal-activity-id">
+                
+                <div class="form-group">
+                    <label for="activity-title">Activity Title *</label>
+                    <input type="text" id="activity-title" placeholder="e.g. Visit Tokyo Tower" required autocomplete="off">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="activity-start">Start Time *</label>
+                        <input type="time" id="activity-start" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="activity-end">End Time *</label>
+                        <input type="time" id="activity-end" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="activity-location">Location / Place Details</label>
+                    <input type="text" id="activity-location" placeholder="e.g. 4 Chome-2-8 Shibakoen, Minato City" autocomplete="off">
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="activity-reminder">
+                    <label for="activity-reminder">Set Alert Reminder</label>
+                </div>
+
+                <div class="form-group id-reminder-time-group" id="reminder-time-container">
+                    <label for="activity-reminder-time">Alert Time (Hour/Min before start)</label>
+                    <div class="reminder-time-select-row">
+                        <select id="activity-reminder-offset">
+                            <option value="0">At start time</option>
+                            <option value="5">5 minutes before</option>
+                            <option value="15">15 minutes before</option>
+                            <option value="30" selected>30 minutes before</option>
+                            <option value="60">1 hour before</option>
+                            <option value="120">2 hours before</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-modal">Cancel</button>
+                    <button type="submit" class="btn btn-accent" id="save-activity-btn">Save Activity</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Active Reminder Banner/Alert -->
+    <div id="reminder-toast" class="toast">
+        <div class="toast-content">
+            <i data-lucide="bell" class="toast-bell"></i>
+            <div>
+                <h4 id="toast-title">Reminder Alert</h4>
+                <p id="toast-body">It is time for your activity!</p>
+            </div>
+        </div>
+        <button class="close-toast-btn" id="close-toast"><i data-lucide="x"></i></button>
+    </div>
+
+    <script src="scheduler.js"></script>
+</body>
+</html>
