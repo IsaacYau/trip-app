@@ -792,7 +792,8 @@ if (typeof document !== 'undefined') {
 
                 await updateAuth0StateUI();
             } catch (err) {
-                console.warn("Auth0 initialization failed. Using Guest fallback.", err);
+                console.error("Auth0 initialization error:", err);
+                alert("Auth0 Init Error: " + err.message);
             }
         };
 
@@ -823,7 +824,7 @@ if (typeof document !== 'undefined') {
 
         auth0LoginBtn.addEventListener("click", async () => {
             if (!auth0Client) {
-                alert("Auth0 failed to initialize. Please verify config.js settings.");
+                alert("Auth0 failed to initialize. Please ensure you are online and verify your client configuration.");
                 return;
             }
             await auth0Client.loginWithRedirect();
