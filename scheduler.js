@@ -1,8 +1,8 @@
 // -------------------------------------------------------------------------
 // AUTH0 OAUTH 2.0 PKCE CONFIGURATION (Direct variables for Production)
 // -------------------------------------------------------------------------
-const AUTH0_DOMAIN = "YOUR_DOMAIN_HERE.auth0.com";
-const AUTH0_CLIENT_ID = "YOUR_CLIENT_ID_HERE";
+const AUTH0_DOMAIN = "dev-g2mi5dgt2evdxv38.us.auth0.com";
+const AUTH0_CLIENT_ID = "dLVGrZitJ4zZiFJMwvThnKhGChTYkAOg";
 
 // -------------------------------------------------------------------------
 // PURE LOGICAL UTILITIES (Outside DOM wrapper for unit-testability)
