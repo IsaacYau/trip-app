@@ -1,18 +1,44 @@
 const assert = require("assert");
+const fs = require("fs");
+const vm = require("vm");
 
 // Mock document and window for Node testing
-global.document = {
+const mockDocument = {
     addEventListener: () => {}
 };
 
-// Require our modular functions from scheduler.js
-// Note: We will add module.exports to scheduler.js so it exports these cleanly.
+// Read scheduler.js content
+let code = fs.readFileSync("./scheduler.js", "utf8");
+
+// Strip the browser-only ES static imports from scheduler.js before vm execution
+code = code.replace(/import\s+[\s\S]*?from\s+["']https:\/\/[\s\S]*?["'];?/g, "");
+code = code.replace(/import\s+[\s\S]*?from\s+["']\.\/config\.js["'];?/g, "");
+
+// Create sandbox context with standard mocks
+const sandbox = {
+    global: {},
+    console,
+    module: { exports: {} },
+    document: mockDocument,
+    typeof: (val) => typeof val,
+    // Mock Firebase functions so top-level calls in scheduler.js succeed
+    firebaseConfig: {},
+    initializeApp: () => ({}),
+    getAuth: () => ({}),
+    GoogleAuthProvider: class {}
+};
+sandbox.exports = sandbox.module.exports;
+
+// Execute the modular scheduler code in a sandbox context
+vm.createContext(sandbox);
+vm.runInContext(code, sandbox);
+
 const {
     convertToHkd,
     findDijkstraRoute,
     calculateDebtSettlement,
     FX_RATES
-} = require("./scheduler.js");
+} = sandbox.module.exports;
 
 console.log("=== RUNNING ROAMREADY AUTOMATED TDD TESTS ===");
 

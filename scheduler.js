@@ -1,8 +1,13 @@
 // -------------------------------------------------------------------------
-// AUTH0 OAUTH 2.0 PKCE CONFIGURATION (Direct variables for Production)
+// FIREBASE AUTHENTICATION CONFIGURATION
 // -------------------------------------------------------------------------
-const AUTH0_DOMAIN = "dev-g2mi5dgt2evdxv38.us.auth0.com";
-const AUTH0_CLIENT_ID = "dLVGrZitJ4zZiFJMwvThnKhGChTYkAOg";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+import { firebaseConfig } from "./config.js";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
 
 // -------------------------------------------------------------------------
 // PURE LOGICAL UTILITIES (Outside DOM wrapper for unit-testability)
@@ -251,7 +256,7 @@ if (typeof document !== 'undefined') {
             currentMonth: new Date().getMonth(),
             destination: "japan",
             activeUser: "Alice",
-            auth0User: null,
+            firebaseUser: null,
             expenses: [],
             icCards: {
                 Alice: { JPY: 2000, MYR: 50, CNY: 100, logs: [] },
@@ -766,78 +771,44 @@ if (typeof document !== 'undefined') {
         }
 
         // -------------------------------------------------------------------------
-        // AUTH0 OAUTH 2.0 PKCE SECURITY FLOW
+        // FIREBASE GOOGLE AUTHENTICATION SYSTEM
         // -------------------------------------------------------------------------
-        let auth0Client = null;
-
-        const initAuth0 = async () => {
-            
-
-
-            try {
-                auth0Client = await auth0.createAuth0Client({
-                    domain: AUTH0_DOMAIN,
-                    client_id: AUTH0_CLIENT_ID,
-                    authorizationParams: {
-                        redirect_uri: window.location.origin + window.location.pathname
-                    }
-                });
-
-                // Handle Auth0 Redirect Callback if returning from sign-in
-                const query = window.location.search;
-                if (query.includes("code=") && query.includes("state=")) {
-                    await auth0Client.handleRedirectCallback();
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }
-
-                await updateAuth0StateUI();
-            } catch (err) {
-                console.error("Auth0 initialization error:", err);
-                alert("Auth0 Init Error: " + err.message);
-            }
-        };
-
-        const updateAuth0StateUI = async () => {
-            if (!auth0Client) return;
-
-            const isAuthenticated = await auth0Client.isAuthenticated();
-
-            if (isAuthenticated) {
-                const user = await auth0Client.getUser();
-                state.auth0User = user;
-
-                // Sync Auth0 profile name to RoamReady state
-                state.activeUser = user.nickname || user.name || "AuthUser";
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                state.firebaseUser = user;
+                // Sync Firebase profile name/email to RoamReady state
+                state.activeUser = user.displayName || user.email || "FirebaseUser";
                 localStorage.setItem("travelActiveUser", state.activeUser);
 
                 auth0LoginBtn.style.display = "none";
                 auth0ProfileDiv.style.display = "flex";
-                auth0UserAvatar.src = user.picture || "";
+                auth0UserAvatar.src = user.photoURL || "";
                 
                 updateProfileUI();
             } else {
-                state.auth0User = null;
+                state.firebaseUser = null;
                 auth0LoginBtn.style.display = "inline-flex";
                 auth0ProfileDiv.style.display = "none";
             }
-        };
+        });
 
         auth0LoginBtn.addEventListener("click", async () => {
-            if (!auth0Client) {
-                alert("Auth0 failed to initialize. Please ensure you are online and verify your client configuration.");
-                return;
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (err) {
+                console.error("Firebase Login Error:", err);
+                alert("Login Error: " + err.message);
             }
-            await auth0Client.loginWithRedirect();
         });
 
         auth0LogoutBtn.addEventListener("click", async () => {
-            if (!auth0Client) return;
-            state.auth0User = null;
-            await auth0Client.logout({
-                logoutParams: {
-                    returnTo: window.location.origin + window.location.pathname
-                }
-            });
+            try {
+                state.firebaseUser = null;
+                await signOut(auth);
+            } catch (err) {
+                console.error("Firebase Logout Error:", err);
+                alert("Logout Error: " + err.message);
+            }
         });
 
         icPassengerSelect.addEventListener("change", (e) => {
@@ -1109,9 +1080,9 @@ if (typeof document !== 'undefined') {
         expenseForm.addEventListener("submit", (e) => {
             e.preventDefault();
 
-            // Protect the Shared Wallet: require Auth0 login to add expenses
-            if (!state.auth0User) {
-                alert("🔒 Authentication Required: You must log in via Auth0 to add expenses to the group wallet.");
+            // Protect the Shared Wallet: require Google login to add expenses
+            if (!state.firebaseUser) {
+                alert("🔒 Authentication Required: You must log in via Google to add expenses to the group wallet.");
                 return;
             }
             const title = expenseTitleInput.value;
@@ -1414,8 +1385,7 @@ if (typeof document !== 'undefined') {
         renderLedger();
         renderDebtSettlement();
 
-        // Initialize Auth0 PKCE Security
-        initAuth0();
+
 
         // Auto-show login signup screen on very first launch
         if (state.activeUser === "Guest") {

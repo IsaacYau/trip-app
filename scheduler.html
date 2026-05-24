@@ -11,8 +11,6 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="scheduler.css">
-    <!-- Auth0 SDK -->
-    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
 </head>
 <body>
     <!-- Premium Top Bar -->
@@ -33,7 +31,7 @@
                     <span id="current-user-display">Sign In</span>
                 </button>
             </div>
-            <!-- Auth0 Security Panel -->
+            <!-- Firebase Security Panel -->
             <div id="auth0-section" class="header-select-group" style="display: flex; align-items: center; gap: 0.4rem;">
                 <button type="button" id="auth0-login-btn" class="header-select profile-badge-btn" style="display: flex; align-items: center; gap: 0.25rem; background-color: var(--accent); color: #ffffff; border-color: var(--accent); font-weight: 800;">
                     <i data-lucide="log-in" style="width:12px; height:12px;"></i>
@@ -528,6 +526,6 @@
         <button class="close-toast-btn" id="close-toast"><i data-lucide="x"></i></button>
     </div>
 
-    <script src="scheduler.js"></script>
+    <script type="module" src="scheduler.js"></script>
 </body>
 </html>
