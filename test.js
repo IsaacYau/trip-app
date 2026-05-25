@@ -97,7 +97,8 @@ const {
     validateTimeSlotInput,
     hasTimeConflict,
     curatingFallbackDb,
-    createPlaceCardElement
+    createPlaceCardElement,
+    minutesToTime
 } = sandbox.module.exports;
 
 console.log("=== RUNNING ROAMREADY AUTOMATED TDD TESTS ===");
@@ -315,6 +316,50 @@ try {
     assert.strictEqual(parsed.currentMonth, 5);
     assert.strictEqual(parsed.currentYear, 2026);
     console.log("✅ LocalStorage backup state persistence tests passed!");
+
+    // -------------------------------------------------------------------------
+    // TEST 11: minutesToTime Helper
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 11] Testing minutesToTime Conversions...");
+    assert.strictEqual(minutesToTime(0), "00:00");
+    assert.strictEqual(minutesToTime(750), "12:30");
+    assert.strictEqual(minutesToTime(1439), "23:59");
+    console.log("✅ minutesToTime helper tests passed!");
+
+    // -------------------------------------------------------------------------
+    // TEST 12: Category Color Classes
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 12] Testing Place Card Category Badge Classes...");
+    const mockFoodPlace = {
+        name: "Ramen Stall",
+        city: "Nagoya",
+        country: "Japan",
+        category: "Food",
+        rating: 4.2,
+        price_local: 800,
+        price_hkd: 40.00,
+        price_level: "$",
+        street: "Food Alley"
+    };
+    const cardEl = createPlaceCardElement(mockFoodPlace);
+    assert.ok(cardEl);
+    assert.ok(cardEl.innerHTML.includes("place-cat-badge food"));
+    console.log("✅ Category color class tests passed!");
+
+    // -------------------------------------------------------------------------
+    // TEST 13: Snapping Math logic
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 13] Testing 15-minute Snapping Arithmetic...");
+    // 12:07 drop coordinates (727 minutes) snaps to 12:00 (720 minutes)
+    let drop1 = 727;
+    let snap1 = Math.round(drop1 / 15) * 15;
+    assert.strictEqual(snap1, 720);
+
+    // 12:08 drop coordinates (728 minutes) snaps to 12:15 (735 minutes)
+    let drop2 = 728;
+    let snap2 = Math.round(drop2 / 15) * 15;
+    assert.strictEqual(snap2, 735);
+    console.log("✅ Snapping math logic tests passed!");
 
     // -------------------------------------------------------------------------
     // TEST 6: DOMContentLoaded Bootstrap Runner

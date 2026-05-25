@@ -284,6 +284,13 @@ function calculateDebtSettlement(expenses) {
 }
 
 
+function minutesToTime(mins) {
+    const h = String(Math.floor(mins / 60)).padStart(2, '0');
+    const m = String(mins % 60).padStart(2, '0');
+    return `${h}:${m}`;
+}
+
+
 function curatingFallbackDb() {
     return [
         {
@@ -593,6 +600,8 @@ if (typeof document !== 'undefined') {
         const activityStartInput = document.getElementById("activity-start");
         const activityEndInput = document.getElementById("activity-end");
         const activityLocationInput = document.getElementById("activity-location");
+        const activityCategorySelect = document.getElementById("activity-category");
+        const locationSuggestions = document.getElementById("location-suggestions");
         const activityReminderCheckbox = document.getElementById("activity-reminder");
         const reminderTimeContainer = document.getElementById("reminder-time-container");
         const activityReminderOffsetSelect = document.getElementById("activity-reminder-offset");
@@ -724,13 +733,14 @@ if (typeof document !== 'undefined') {
                 if (dayActs.length > 0) {
                     previewHTML = `<div class="calendar-activities-preview">`;
                     dayActs.slice(0, 2).forEach(act => {
-                        previewHTML += `<div class="activity-dot-preview" title="${act.timeStart} - ${act.title}">${act.title}</div>`;
+                        const catClass = act.category ? `cat-${act.category.toLowerCase()}` : "cat-sights";
+                        previewHTML += `<div class="activity-dot-preview ${catClass}" title="${act.timeStart} - ${act.title}">${act.title}</div>`;
                     });
                     if (dayActs.length > 2) previewHTML += `<div class="activity-dot-preview" style="background-color: var(--text-secondary)">+${dayActs.length - 2} more</div>`;
                     previewHTML += `</div>`;
                 }
                 const activeClass = state.selectedDay === day ? "active-day" : "";
-                calendarHTML += `<td class="calendar-day ${activeClass}" data-day="${day}"><div class="day-number">${day}</div>${previewHTML}</td>`;
+                calendarHTML += `<td class="calendar-day ${activeClass}" data-day="${day}" ondragover="calendarDayDragOverHandler(event)" ondragleave="calendarDayDragLeaveHandler(event)" ondrop="calendarDayDropHandler(event, ${day})"><div class="day-number">${day}</div>${previewHTML}</td>`;
             }
             const totalCells = firstDay + daysInMonth;
             const remaining = (7 - (totalCells % 7)) % 7;
@@ -766,30 +776,83 @@ if (typeof document !== 'undefined') {
                 if (window.lucide) lucide.createIcons();
                 return;
             }
+
             const dayActs = state.activities.filter(a => a.day === state.selectedDay).sort((a, b) => timeToMinutes(a.timeStart) - timeToMinutes(b.timeStart));
-            if (dayActs.length === 0) {
-                placeInfo.innerHTML = `<div class="empty-state"><i data-lucide="compass" class="empty-icon"></i><p>No activities planned for this day yet.</p></div>`;
-                if (window.lucide) lucide.createIcons();
-                return;
+
+            // Generate 24 Hour rows
+            let hourRowsHtml = "";
+            for (let h = 0; h < 24; h++) {
+                const padH = String(h).padStart(2, '0');
+                hourRowsHtml += `
+                    <div class="hour-row" style="top: ${h * 60}px;">
+                        <span class="hour-label">${padH}:00</span>
+                        <div class="hour-line"></div>
+                    </div>
+                `;
             }
-            let listHTML = `<div class="activities-list">`;
+
+            // Generate Draggable Visual Activity Blocks
+            let blocksHtml = "";
             dayActs.forEach(act => {
-                const reminderBadge = act.reminder ? `<span class="activity-badge badge-alert"><i data-lucide="bell" style="width:10px; height:10px;"></i> Alert: -${act.reminderOffset}m</span>` : "";
-                listHTML += `
-                    <div class="activity-item" data-id="${act.id}">
-                        <div class="activity-main-info">
-                            <div class="activity-time"><i data-lucide="clock"></i> <span>${act.timeStart} - ${act.timeEnd}</span> ${reminderBadge}</div>
-                            <div class="activity-name">${act.title}</div>
-                            ${act.location ? `<div class="activity-loc"><i data-lucide="map-pin"></i> <span>${act.location}</span></div>` : ""}
+                const catClass = act.category ? `cat-${act.category.toLowerCase()}` : "cat-sights";
+                const startM = timeToMinutes(act.timeStart);
+                const endM = timeToMinutes(act.timeEnd);
+                const dur = endM - startM;
+
+                const top = startM; // 1px = 1 min
+                const height = Math.max(dur, 40); // At least 40px height for text visibility
+
+                const reminderIcon = act.reminder ? `<i data-lucide="bell" style="width:10px; height:10px; color: var(--danger);"></i>` : "";
+
+                blocksHtml += `
+                    <div class="time-block-activity ${catClass}" 
+                         style="top: ${top}px; height: ${height}px;" 
+                         draggable="true" 
+                         data-id="${act.id}"
+                         ondragstart="activityDragStartHandler(event)">
+                        <div class="time-block-title">${act.title}</div>
+                        <div class="time-block-time">
+                            <i data-lucide="clock"></i>
+                            <span>${act.timeStart} - ${act.timeEnd}</span>
+                            ${reminderIcon}
                         </div>
-                        <div class="activity-actions">
-                            <button class="action-icon-btn edit-action" title="Edit Activity" onclick="editActivityHandler('${act.id}')"><i data-lucide="edit-3"></i></button>
-                            <button class="action-icon-btn delete-action" title="Delete Activity" onclick="deleteActivityHandler('${act.id}')"><i data-lucide="trash-2"></i></button>
+                        ${act.location ? `<div class="time-block-loc">📍 ${act.location.split(",")[0]}</div>` : ""}
+                        <div class="time-block-actions">
+                            <button class="time-block-btn" onclick="event.stopPropagation(); editActivityHandler('${act.id}')">
+                                <i data-lucide="edit-3"></i>
+                            </button>
+                            <button class="time-block-btn" onclick="event.stopPropagation(); deleteActivityHandler('${act.id}')">
+                                <i data-lucide="trash-2"></i>
+                            </button>
                         </div>
-                    </div>`;
+                    </div>
+                `;
             });
-            listHTML += `</div>`;
-            placeInfo.innerHTML = listHTML;
+
+            // Assemble Full Grid
+            placeInfo.innerHTML = `
+                <div class="calendar-day-view" id="day-grid-viewport">
+                    <div class="time-grid-container" id="day-grid-container"
+                         ondragover="gridDragOverHandler(event)" 
+                         ondragleave="gridDragLeaveHandler(event)"
+                         ondrop="gridDropHandler(event)">
+                        ${hourRowsHtml}
+                        ${blocksHtml}
+                    </div>
+                </div>
+            `;
+
+            // Auto Scroll Viewport to first activity (if exists) or 08:00
+            const viewport = document.getElementById("day-grid-viewport");
+            if (viewport) {
+                if (dayActs.length > 0) {
+                    const firstStart = timeToMinutes(dayActs[0].timeStart);
+                    viewport.scrollTop = Math.max(0, firstStart - 100);
+                } else {
+                    viewport.scrollTop = 480; // Scroll to 08:00
+                }
+            }
+
             if (window.lucide) lucide.createIcons();
         }
 
@@ -807,14 +870,109 @@ if (typeof document !== 'undefined') {
             }
         };
 
+        // DRAG AND DROP HANDLERS FOR GOOGLE CALENDAR GRID & CALENDAR SWAPPING
+        window.activityDragStartHandler = function(e) {
+            e.dataTransfer.setData("text/plain", e.target.getAttribute("data-id"));
+            e.dataTransfer.effectAllowed = "move";
+        };
+
+        window.gridDragOverHandler = function(e) {
+            e.preventDefault();
+            const container = document.getElementById("day-grid-container");
+            if (container) container.classList.add("drag-over-grid");
+        };
+
+        window.gridDragLeaveHandler = function(e) {
+            e.preventDefault();
+            const container = document.getElementById("day-grid-container");
+            if (container) container.classList.remove("drag-over-grid");
+        };
+
+        window.gridDropHandler = function(e) {
+            e.preventDefault();
+            const container = document.getElementById("day-grid-container");
+            if (container) container.classList.remove("drag-over-grid");
+
+            const actId = e.dataTransfer.getData("text/plain");
+            const act = state.activities.find(a => a.id === actId);
+            if (!act) return;
+
+            const rect = e.currentTarget.getBoundingClientRect();
+            const offsetY = e.clientY - rect.top;
+
+            // 1px = 1 min
+            let dropMinutes = offsetY;
+            // Snap to 15-minute intervals
+            dropMinutes = Math.round(dropMinutes / 15) * 15;
+            dropMinutes = Math.max(0, Math.min(1440, dropMinutes));
+
+            const duration = timeToMinutes(act.timeEnd) - timeToMinutes(act.timeStart);
+            let newStart = dropMinutes;
+            if (newStart + duration > 1440) {
+                newStart = 1440 - duration;
+            }
+
+            const newStartTimeStr = minutesToTime(newStart);
+            const newEndTimeStr = minutesToTime(newStart + duration);
+
+            // Time conflict check
+            const conflict = hasTimeConflict(state.activities, act.day, newStartTimeStr, newEndTimeStr, act.id);
+            if (conflict) {
+                alert(`Time Conflict: Shifting "${act.title}" overlaps with "${conflict.title}". Drop rejected.`);
+                return;
+            }
+
+            act.timeStart = newStartTimeStr;
+            act.timeEnd = newEndTimeStr;
+
+            saveActivitiesToStorage();
+            generateCalendar();
+            renderActivitiesList();
+        };
+
+        window.calendarDayDragOverHandler = function(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add("drag-over-day");
+        };
+
+        window.calendarDayDragLeaveHandler = function(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove("drag-over-day");
+        };
+
+        window.calendarDayDropHandler = function(e, targetDay) {
+            e.preventDefault();
+            e.currentTarget.classList.remove("drag-over-day");
+
+            const actId = e.dataTransfer.getData("text/plain");
+            const act = state.activities.find(a => a.id === actId);
+            if (!act) return;
+
+            // Time conflict check on target day
+            const conflict = hasTimeConflict(state.activities, targetDay, act.timeStart, act.timeEnd, act.id);
+            if (conflict) {
+                alert(`Time Conflict on target day: Overlaps with "${conflict.title}". Swapping date rejected.`);
+                return;
+            }
+
+            act.day = targetDay;
+
+            saveActivitiesToStorage();
+            generateCalendar();
+            selectDay(targetDay);
+        };
+
         // Modals
         function openModal(day, activity = null, prefill = null) {
             modalDayInput.value = day;
             activityForm.reset();
+            locationSuggestions.style.display = "none";
+            locationSuggestions.innerHTML = "";
             if (activity) {
                 modalTitle.textContent = "Edit Activity";
                 modalActivityIdInput.value = activity.id;
                 activityTitleInput.value = activity.title;
+                activityCategorySelect.value = activity.category || "Sights";
                 activityStartInput.value = activity.timeStart;
                 activityEndInput.value = activity.timeEnd;
                 activityLocationInput.value = activity.location || "";
@@ -825,9 +983,11 @@ if (typeof document !== 'undefined') {
             } else {
                 modalTitle.textContent = "Add Activity";
                 modalActivityIdInput.value = "";
+                activityCategorySelect.value = "Sights";
                 reminderTimeContainer.classList.remove("show");
                 if (prefill) {
                     activityTitleInput.value = prefill.title || "";
+                    activityCategorySelect.value = prefill.category || "Sights";
                     activityLocationInput.value = prefill.location || "";
                     activityStartInput.value = prefill.timeStart || "";
                     activityEndInput.value = prefill.timeEnd || "";
@@ -836,7 +996,11 @@ if (typeof document !== 'undefined') {
             activityModal.classList.add("open");
         }
 
-        function closeModal() { activityModal.classList.remove("open"); }
+        function closeModal() {
+            activityModal.classList.remove("open");
+            locationSuggestions.style.display = "none";
+            locationSuggestions.innerHTML = "";
+        }
         addActivityBtn.addEventListener("click", () => { if (state.selectedDay !== null) openModal(state.selectedDay); });
         closeModalBtn.addEventListener("click", closeModal);
         cancelModalBtn.addEventListener("click", closeModal);
@@ -849,7 +1013,11 @@ if (typeof document !== 'undefined') {
             e.preventDefault();
             const day = Number(modalDayInput.value);
             const id = modalActivityIdInput.value || `act-${Date.now()}`;
-            const title = activityTitleInput.value;
+            const category = activityCategorySelect.value || "Sights";
+            let title = activityTitleInput.value.trim();
+            if (!title) {
+                title = category;
+            }
             const start = activityStartInput.value;
             const end = activityEndInput.value;
             const location = activityLocationInput.value;
@@ -862,7 +1030,7 @@ if (typeof document !== 'undefined') {
             const conflict = hasTimeConflict(state.activities, day, start, end, modalActivityIdInput.value ? id : null);
             if (conflict) { alert(`Time Conflict with "${conflict.title}"!`); return; }
 
-            const newAct = { id, day, title, timeStart: start, timeEnd: end, location, reminder, reminderOffset };
+            const newAct = { id, day, title, category, timeStart: start, timeEnd: end, location, reminder, reminderOffset };
             if (modalActivityIdInput.value) {
                 const idx = state.activities.findIndex(a => a.id === id);
                 if (idx !== -1) state.activities[idx] = newAct;
@@ -872,6 +1040,55 @@ if (typeof document !== 'undefined') {
             closeModal();
             generateCalendar();
             renderActivitiesList();
+        });
+
+        // Smart location word-matching autocomplete
+        activityLocationInput.addEventListener("input", (e) => {
+            const val = e.target.value.toLowerCase().trim();
+            if (!val) {
+                locationSuggestions.style.display = "none";
+                locationSuggestions.innerHTML = "";
+                return;
+            }
+
+            const matches = placesDatabase.filter(p => {
+                return (p.name && p.name.toLowerCase().includes(val)) ||
+                       (p.street && p.street.toLowerCase().includes(val));
+            });
+
+            if (matches.length === 0) {
+                locationSuggestions.style.display = "none";
+                locationSuggestions.innerHTML = "";
+                return;
+            }
+
+            locationSuggestions.innerHTML = "";
+            locationSuggestions.style.display = "block";
+
+            matches.slice(0, 5).forEach(match => {
+                const item = document.createElement("div");
+                item.className = "suggestion-item";
+                item.innerHTML = `
+                    <span class="suggestion-name">${match.name}</span>
+                    <span class="suggestion-street">📍 ${match.city}, ${match.street}</span>
+                `;
+                item.addEventListener("click", () => {
+                    activityLocationInput.value = `${match.name}, ${match.street}`;
+                    activityCategorySelect.value = match.category || "Sights";
+                    if (!activityTitleInput.value.trim()) {
+                        activityTitleInput.value = match.name;
+                    }
+                    locationSuggestions.style.display = "none";
+                    locationSuggestions.innerHTML = "";
+                });
+                locationSuggestions.appendChild(item);
+            });
+        });
+
+        document.addEventListener("click", (e) => {
+            if (e.target !== activityLocationInput && e.target !== locationSuggestions) {
+                locationSuggestions.style.display = "none";
+            }
         });
 
         saveScheduleBtn.addEventListener("click", () => {
@@ -1710,6 +1927,7 @@ if (typeof module !== 'undefined' && module.exports) {
         TRANSIT_NETWORKS,
         FX_RATES,
         timeToMinutes,
+        minutesToTime,
         validateActivityInput,
         validateTimeSlotInput,
         hasTimeConflict,

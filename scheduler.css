@@ -1859,3 +1859,263 @@ select:focus {
 }
 
 
+/* =========================================================================
+   SCHEDULER IMPROVEMENT STYLES
+   ========================================================================= */
+
+/* 1. Location Autocomplete Suggestions */
+.suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(10px);
+}
+
+.suggestion-item {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    text-align: left;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-item:hover {
+    background-color: var(--accent-light);
+    color: var(--accent);
+}
+
+.suggestion-name {
+    font-weight: 750;
+    color: var(--text-primary);
+}
+
+.suggestion-street {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+/* 2. Category Colorings for Activity Cards */
+.activity-item.cat-food {
+    border-left-color: #f59e0b !important;
+    background-color: rgba(245, 158, 11, 0.04);
+}
+.activity-item.cat-sights {
+    border-left-color: #0ea5e9 !important;
+    background-color: rgba(14, 165, 233, 0.04);
+}
+.activity-item.cat-shopping {
+    border-left-color: #a855f7 !important;
+    background-color: rgba(168, 85, 247, 0.04);
+}
+.activity-item.cat-entertainment {
+    border-left-color: #22c55e !important;
+    background-color: rgba(34, 197, 94, 0.04);
+}
+
+.time-block-activity.cat-food {
+    border-left-color: #f59e0b !important;
+    background-color: rgba(245, 158, 11, 0.08);
+}
+.time-block-activity.cat-sights {
+    border-left-color: #0ea5e9 !important;
+    background-color: rgba(14, 165, 233, 0.08);
+}
+.time-block-activity.cat-shopping {
+    border-left-color: #a855f7 !important;
+    background-color: rgba(168, 85, 247, 0.08);
+}
+.time-block-activity.cat-entertainment {
+    border-left-color: #22c55e !important;
+    background-color: rgba(34, 197, 94, 0.08);
+}
+
+/* Calendar Dot Category Colors */
+.activity-dot-preview.cat-food {
+    background-color: #f59e0b !important;
+    color: #ffffff;
+}
+.activity-dot-preview.cat-sights {
+    background-color: #0ea5e9 !important;
+    color: #ffffff;
+}
+.activity-dot-preview.cat-shopping {
+    background-color: #a855f7 !important;
+    color: #ffffff;
+}
+.activity-dot-preview.cat-entertainment {
+    background-color: #22c55e !important;
+    color: #ffffff;
+}
+
+/* 3. Google Calendar Style Visual Day Grid */
+.calendar-day-view {
+    position: relative;
+    height: 520px; /* Scrollable viewport */
+    overflow-y: auto;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-family: var(--font-primary);
+    margin-top: 0.5rem;
+    scrollbar-width: thin;
+}
+
+.time-grid-container {
+    position: relative;
+    width: 100%;
+    height: 1440px; /* 1px = 1 minute height scale */
+}
+
+.hour-row {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 60px; /* 60px per hour */
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: flex-start;
+    pointer-events: none;
+}
+
+.hour-label {
+    width: 60px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    padding-left: 0.5rem;
+    padding-top: 0.2rem;
+    user-select: none;
+}
+
+.hour-line {
+    flex-grow: 1;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.02);
+    margin-top: 0.5rem;
+}
+
+/* Draggable activity blocks absolutely positioned */
+.time-block-activity {
+    position: absolute;
+    left: 65px; /* Leave space for hour labels */
+    right: 10px;
+    border-radius: var(--radius-sm);
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: var(--shadow-sm);
+    cursor: grab;
+    transition: box-shadow 0.15s, transform 0.1s, border-color 0.15s;
+    border-left: 4px solid var(--accent);
+    background-color: var(--bg-primary);
+    user-select: none;
+    z-index: 10;
+    overflow: hidden;
+    text-align: left;
+}
+
+.time-block-activity:active {
+    cursor: grabbing;
+    box-shadow: var(--shadow-lg);
+    transform: scale(0.985);
+    z-index: 50;
+}
+
+.time-block-title {
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.time-block-time {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.time-block-time i {
+    width: 10px;
+    height: 10px;
+}
+
+.time-block-loc {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.time-block-actions {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    display: flex;
+    gap: 0.1rem;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.time-block-activity:hover .time-block-actions {
+    opacity: 1;
+}
+
+.time-block-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 1px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.time-block-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--accent);
+}
+
+.time-block-btn i {
+    width: 12px;
+    height: 12px;
+}
+
+/* Drag & Drop Visual cues */
+.calendar-day.drag-over-day {
+    background-color: var(--accent-light) !important;
+    border: 2px dashed var(--accent) !important;
+    transform: scale(0.96);
+    box-shadow: var(--shadow-md);
+    transition: all 0.15s ease-out;
+}
+
+.time-grid-container.drag-over-grid {
+    background-color: rgba(99, 102, 241, 0.05);
+}
+
+
