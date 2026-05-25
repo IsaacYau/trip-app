@@ -804,7 +804,7 @@ if (typeof document !== 'undefined') {
                 Food: { bg: "#FEF9C3", border: "#CA8A04", text: "#713F12" }, // Pastel Yellow
                 Sights: { bg: "#E0F2FE", border: "#0EA5E9", text: "#0C4A6E" }, // Pastel Blue
                 Shopping: { bg: "#F3E8FF", border: "#A855F7", text: "#581C87" }, // Pastel Purple
-                Entertainment: { bg: "#FEE2E2", border: "#EF4444", text: "#7F1D1D" } // Pastel Red
+                Entertainment: { bg: "#DCFCE7", border: "#22C55E", text: "#14532D" } // Pastel Green
             };
             const defaultColors = { bg: "#E0F2FE", border: "#0EA5E9", text: "#0C4A6E" };
 
