@@ -28,6 +28,12 @@
                     <option value="china">🇨🇳 China (Shenzhen)</option>
                     <option value="malaysia">🇲🇾 Malaysia (KL/Penang)</option>
                 </select>
+                <select id="active-group-select" class="header-select" title="Choose Active Trip" style="font-weight: 750;">
+                    <option value="TRIP-2026">TRIP-2026</option>
+                </select>
+                <button id="network-modal-btn" class="header-select profile-badge-btn" title="Create or Join Trip Network" style="display:flex; align-items:center; justify-content:center; width:34px; height:34px; padding:0; flex-shrink:0;">
+                    <i data-lucide="network" style="width:16px; height:16px;"></i>
+                </button>
                 <button id="profile-badge-btn" class="header-select profile-badge-btn" title="Manage Account & Group" style="display:flex; align-items:center; gap:0.25rem;">
                     <i data-lucide="user" style="width:12px; height:12px;"></i>
                     <span id="current-user-display">Sign In</span>
@@ -540,6 +546,55 @@
                 <div class="modal-actions" style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.5rem;">
                     <button type="button" class="btn btn-secondary" id="auth-cancel-btn" style="flex: 1; display: none;">Cancel</button>
                     <button type="submit" class="btn btn-accent" style="flex: 2;">Enter Group Trip</button>
+                </div>
+            </form>
+    </div>
+
+    <!-- Radmin VPN Inspired Network Modal -->
+    <div id="network-modal" class="modal-overlay">
+        <div class="modal-container" style="max-width: 420px; padding: 1.5rem;">
+            <div class="modal-header" style="border-bottom: 2px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="font-family: var(--font-heading); font-weight: 800; font-size: 1.25rem; display: flex; align-items: center; gap: 0.35rem; margin: 0;">
+                    <i data-lucide="network" style="width:20px; height:20px; color:var(--accent);"></i> Trip Network Management
+                </h3>
+                <button class="close-modal-btn" id="close-network-modal"><i data-lucide="x"></i></button>
+            </div>
+            
+            <!-- Radmin Tabs -->
+            <div class="network-tabs" style="display: flex; border-bottom: 2px solid var(--border); margin-bottom: 1.25rem; gap: 0.5rem;">
+                <button class="network-tabactive active" id="tab-create-network" style="flex: 1; padding: 0.6rem; border: none; background: none; font-family: var(--font-heading); font-weight: 800; font-size: 0.85rem; cursor: pointer; text-align: center; border-bottom: 3px solid var(--accent); color: var(--accent);">Create Network</button>
+                <button class="network-tabactive" id="tab-join-network" style="flex: 1; padding: 0.6rem; border: none; background: none; font-family: var(--font-heading); font-weight: 800; font-size: 0.85rem; cursor: pointer; text-align: center; color: var(--text-secondary); border-bottom: 3px solid transparent;">Join Network</button>
+            </div>
+
+            <!-- Create Form -->
+            <form id="create-network-form" class="modal-form">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="create-network-name" style="display: block; font-size: 0.75rem; font-weight: 750; margin-bottom: 0.35rem; text-align: left;">Trip Network Name *</label>
+                    <input type="text" id="create-network-name" placeholder="e.g. OSAKA-EXP-2026" required style="width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-primary); font-size: 0.85rem;" autocomplete="off">
+                </div>
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label for="create-network-password" style="display: block; font-size: 0.75rem; font-weight: 750; margin-bottom: 0.35rem; text-align: left;">Network Password *</label>
+                    <input type="password" id="create-network-password" placeholder="Enter network password" required style="width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-primary); font-size: 0.85rem;">
+                </div>
+                <div class="modal-actions" style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary cancel-network-btn" style="flex: 1;">Cancel</button>
+                    <button type="submit" class="btn btn-accent" style="flex: 2;">Create Network</button>
+                </div>
+            </form>
+
+            <!-- Join Form -->
+            <form id="join-network-form" class="modal-form" style="display: none;">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="join-network-name" style="display: block; font-size: 0.75rem; font-weight: 750; margin-bottom: 0.35rem; text-align: left;">Trip Network Name *</label>
+                    <input type="text" id="join-network-name" placeholder="e.g. OSAKA-EXP-2026" required style="width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-primary); font-size: 0.85rem;" autocomplete="off">
+                </div>
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label for="join-network-password" style="display: block; font-size: 0.75rem; font-weight: 750; margin-bottom: 0.35rem; text-align: left;">Network Password *</label>
+                    <input type="password" id="join-network-password" placeholder="Enter network password" required style="width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-primary); font-size: 0.85rem;">
+                </div>
+                <div class="modal-actions" style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary cancel-network-btn" style="flex: 1;">Cancel</button>
+                    <button type="submit" class="btn btn-accent" style="flex: 2;">Join Network</button>
                 </div>
             </form>
         </div>

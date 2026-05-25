@@ -2230,4 +2230,17 @@ select:focus {
     100% { transform: rotate(360deg); }
 }
 
+/* Radmin VPN Inspired Network Modal Tabs Styling */
+.network-tabs button {
+    transition: var(--transition);
+}
+.network-tabs button:hover {
+    color: var(--accent);
+    background-color: rgba(99, 102, 241, 0.04);
+}
+.network-tabs button.active {
+    color: var(--accent) !important;
+    border-bottom: 3px solid var(--accent) !important;
+}
+
 
