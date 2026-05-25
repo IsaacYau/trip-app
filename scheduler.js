@@ -1362,11 +1362,11 @@ if (typeof document !== 'undefined') {
             } else {
                 authCancelBtn.style.display = "inline-block";
             }
-            authModal.style.display = "flex";
+            authModal.classList.add("open");
         }
 
         function closeAuthModal() {
-            authModal.style.display = "none";
+            authModal.classList.remove("open");
         }
 
         authForm.addEventListener("submit", (e) => {
@@ -2379,19 +2379,19 @@ if (typeof document !== 'undefined') {
                     alert("Please sign in using Google Authentication to manage Trip Networks.");
                     return;
                 }
-                networkModal.classList.add("active");
+                networkModal.classList.add("open");
             });
         }
 
         if (closeNetworkModalBtn && networkModal) {
             closeNetworkModalBtn.addEventListener("click", () => {
-                networkModal.classList.remove("active");
+                networkModal.classList.remove("open");
             });
         }
 
         cancelNetworkBtns.forEach((btn) => {
             btn.addEventListener("click", () => {
-                if (networkModal) networkModal.classList.remove("active");
+                if (networkModal) networkModal.classList.remove("open");
             });
         });
 
@@ -2464,7 +2464,7 @@ if (typeof document !== 'undefined') {
                     await setDoc(docRef, newNetwork);
                     
                     createNetworkForm.reset();
-                    if (networkModal) networkModal.classList.remove("active");
+                    if (networkModal) networkModal.classList.remove("open");
 
                     alert(`Successfully created Trip Network: ${name}`);
 
@@ -2508,7 +2508,7 @@ if (typeof document !== 'undefined') {
                     });
 
                     joinNetworkForm.reset();
-                    if (networkModal) networkModal.classList.remove("active");
+                    if (networkModal) networkModal.classList.remove("open");
 
                     alert(`Successfully joined Trip Network: ${name}`);
 
