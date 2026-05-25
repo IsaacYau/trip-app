@@ -458,7 +458,20 @@ function createPlaceCardElement(p) {
         localPriceHtml = `CNY ${p.price_local}`;
     }
 
+    const imageHtml = p.imageUrl ? `
+        <div class="place-card-image-wrapper">
+            <img src="${p.imageUrl}" alt="${p.name}" class="place-card-image" onerror="this.parentElement.style.display='none'">
+        </div>
+    ` : "";
+
+    const reviewHtml = p.reviews && p.reviews.length > 0 ? `
+        <div class="place-review-snippet" style="background-color: var(--bg-primary); border-left: 3px solid var(--accent); padding: 0.5rem; border-radius: var(--radius-sm); font-size: 0.68rem; margin: 0.5rem 0; font-style: italic; color: var(--text-secondary); line-height: 1.3; max-height: 50px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+            "${p.reviews[0]}"
+        </div>
+    ` : "";
+
     card.innerHTML = `
+        ${imageHtml}
         <div class="place-header">
             <h4 class="place-title">${p.name}</h4>
             <span class="place-cat-badge ${catClass}">${p.category || "Food"}</span>
@@ -480,6 +493,7 @@ function createPlaceCardElement(p) {
             <span>Price Level:</span>
             <span>${p.price_level}</span>
         </div>
+        ${reviewHtml}
         <div class="place-actions">
             <button class="btn btn-secondary btn-sm" onclick="addPlaceToExpenseHandler('${p.name.replace(/'/g, "\\'")}', ${p.price_hkd}, '${p.category}')">
                 <i data-lucide="wallet" style="width:12px; height:12px; margin-right:2px;"></i> Split Cost
@@ -1046,6 +1060,7 @@ if (typeof document !== 'undefined') {
                 activityReminderOffsetSelect.value = activity.reminderOffset !== undefined ? activity.reminderOffset : "30";
                 if (activity.reminder) reminderTimeContainer.classList.add("show");
                 else reminderTimeContainer.classList.remove("show");
+                updateModalPlacePreview(activity.location);
             } else {
                 modalTitle.textContent = "Add Activity";
                 modalActivityIdInput.value = "";
@@ -1057,6 +1072,9 @@ if (typeof document !== 'undefined') {
                     activityLocationInput.value = prefill.location || "";
                     activityStartInput.value = prefill.timeStart || "";
                     activityEndInput.value = prefill.timeEnd || "";
+                    updateModalPlacePreview(prefill.location);
+                } else {
+                    updateModalPlacePreview("");
                 }
             }
             activityModal.classList.add("open");
@@ -1066,6 +1084,51 @@ if (typeof document !== 'undefined') {
             activityModal.classList.remove("open");
             locationSuggestions.style.display = "none";
             locationSuggestions.innerHTML = "";
+            updateModalPlacePreview("");
+        }
+
+        function updateModalPlacePreview(loc) {
+            const previewDiv = document.getElementById("activity-place-preview");
+            if (!previewDiv) return;
+            
+            if (!loc) {
+                previewDiv.style.display = "none";
+                previewDiv.innerHTML = "";
+                return;
+            }
+
+            const cleanLoc = loc.toLowerCase().trim();
+            const matchedPlace = placesDatabase.find(p => {
+                const name = p.name.toLowerCase();
+                return cleanLoc.includes(name) || name.includes(cleanLoc);
+            });
+
+            if (matchedPlace && matchedPlace.imageUrl) {
+                let reviewsHtml = "";
+                if (matchedPlace.reviews && matchedPlace.reviews.length > 0) {
+                    const reviewItems = matchedPlace.reviews.map(r => `
+                        <div class="place-preview-review-item">"${r}"</div>
+                    `).join("");
+                    reviewsHtml = `
+                        <div class="place-preview-reviews-container">
+                            <strong style="font-size: 0.70rem; color: var(--text-primary);">What travellers say:</strong>
+                            ${reviewItems}
+                        </div>
+                    `;
+                }
+                
+                previewDiv.innerHTML = `
+                    <div class="place-preview-title">📍 ${matchedPlace.name}</div>
+                    <div class="place-preview-image-wrapper">
+                        <img src="${matchedPlace.imageUrl}" alt="${matchedPlace.name}" onerror="this.parentElement.style.display='none'">
+                    </div>
+                    ${reviewsHtml}
+                `;
+                previewDiv.style.display = "flex";
+            } else {
+                previewDiv.style.display = "none";
+                previewDiv.innerHTML = "";
+            }
         }
         addActivityBtn.addEventListener("click", () => { if (state.selectedDay !== null) openModal(state.selectedDay); });
         closeModalBtn.addEventListener("click", closeModal);
@@ -1111,6 +1174,7 @@ if (typeof document !== 'undefined') {
         // Smart location word-matching autocomplete
         activityLocationInput.addEventListener("input", (e) => {
             const val = e.target.value.toLowerCase().trim();
+            updateModalPlacePreview(e.target.value); // Dynamic place details preview updating
             if (!val) {
                 locationSuggestions.style.display = "none";
                 locationSuggestions.innerHTML = "";
@@ -1146,6 +1210,7 @@ if (typeof document !== 'undefined') {
                     }
                     locationSuggestions.style.display = "none";
                     locationSuggestions.innerHTML = "";
+                    updateModalPlacePreview(activityLocationInput.value); // Dynamic place details preview updating
                 });
                 locationSuggestions.appendChild(item);
             });

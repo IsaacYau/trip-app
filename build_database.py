@@ -25,6 +25,11 @@ CITY_CENTERS = {
     "penang": {"lat": 5.4141, "lng": 100.3288, "country": "Malaysia", "currency": "MYR"}
 }
 
+def clean_title(title):
+    if not title:
+        return ""
+    return " ".join(title.lower().split())
+
 def get_unified_category(cat_name):
     if not cat_name:
         return "Sights"
@@ -37,8 +42,71 @@ def get_unified_category(cat_name):
         return "Sights"
     return "Entertainment"
 
-def process_file(filepath, allowed_cities, default_country):
-    print(f"Reading {filepath}...")
+def load_enrichment_data(country):
+    ratings_dict = {}
+    reviews_dict = {}
+    image_urls_dict = {}
+    
+    if country == "Japan":
+        rating_file = "japan_rating.json"
+        reviews_file = "japan_reviews.json"
+        image_file = "japan_imageurl.json"
+    else:
+        rating_file = "malaysia_rating.json"
+        reviews_file = "malaysia_reviews.json"
+        image_file = "malaysia_imageurl.json"
+        
+    print(f"Loading extra data for {country}...")
+    
+    # Load Ratings
+    if os.path.exists(rating_file):
+        with open(rating_file, "r", encoding="utf-8") as f:
+            try:
+                ratings_data = json.load(f)
+                for item in ratings_data:
+                    title = item.get("title")
+                    if title:
+                        ratings_dict[clean_title(title)] = {
+                            "rating": round(float(item.get("totalScore") or 0.0), 1),
+                            "reviewsCount": int(item.get("reviewsCount") or 0)
+                        }
+            except Exception as e:
+                print(f"Warning: Failed to load {rating_file}: {e}")
+                    
+    # Load Reviews
+    if os.path.exists(reviews_file):
+        with open(reviews_file, "r", encoding="utf-8") as f:
+            try:
+                reviews_data = json.load(f)
+                for item in reviews_data:
+                    title = item.get("title")
+                    text = item.get("text")
+                    if title and text:
+                        key = clean_title(title)
+                        if key not in reviews_dict:
+                            reviews_dict[key] = []
+                        if len(reviews_dict[key]) < 3: # limit to top 3 comments
+                            reviews_dict[key].append(text)
+            except Exception as e:
+                print(f"Warning: Failed to load {reviews_file}: {e}")
+                        
+    # Load Image URLs
+    if os.path.exists(image_file):
+        with open(image_file, "r", encoding="utf-8") as f:
+            try:
+                image_data = json.load(f)
+                for item in image_data:
+                    title = item.get("title")
+                    img_url = item.get("imageUrl")
+                    if title and img_url:
+                        image_urls_dict[clean_title(title)] = img_url
+            except Exception as e:
+                print(f"Warning: Failed to load {image_file}: {e}")
+                    
+    return ratings_dict, reviews_dict, image_urls_dict
+
+def process_file(filepath, allowed_cities, default_country, ratings_dict, reviews_dict, image_urls_dict):
+    print(f"Reading raw data from {filepath}...")
     if not os.path.exists(filepath):
         print(f"Error: {filepath} not found!")
         return []
@@ -84,14 +152,23 @@ def process_file(filepath, allowed_cities, default_country):
         if not title:
             continue
         
-        # Rating (Rating)
-        rating = item.get("totalScore")
-        if rating is None:
-            rating = 0.0
-        rating = round(float(rating), 1)
+        clean_key = clean_title(title)
         
-        # Reviews
+        # Match score and rating count from ratings_dict
+        rating = item.get("totalScore") or 0.0
         reviews_count = item.get("reviewsCount") or 0
+        if clean_key in ratings_dict:
+            rating = ratings_dict[clean_key]["rating"]
+            reviews_count = ratings_dict[clean_key]["reviewsCount"]
+            
+        rating = round(float(rating), 1)
+        reviews_count = int(reviews_count)
+        
+        # Match review comments
+        reviews_list = reviews_dict.get(clean_key, [])
+        
+        # Match imageUrl
+        image_url = image_urls_dict.get(clean_key, "")
         
         # Category mapping
         cat_name = item.get("categoryName") or (item.get("categories")[0] if item.get("categories") else None)
@@ -148,7 +225,7 @@ def process_file(filepath, allowed_cities, default_country):
             price_hkd = round(price_local * JPY_TO_HKD, 1)
         else: # MYR
             price_hkd = round(price_local * MYR_TO_HKD, 1)
-        
+            
         records.append({
             "name": title,
             "city": city_display,
@@ -164,17 +241,26 @@ def process_file(filepath, allowed_cities, default_country):
             "currency": currency,
             "price_hkd": price_hkd,
             "price_level": price_level,
-            "street": item.get("street") or ""
+            "street": item.get("street") or "",
+            "imageUrl": image_url,
+            "reviews": reviews_list
         })
         
     return records
 
 def main():
-    # Included Tateyama, Kuwana, Suzuka in Japan list
-    japan_records = process_file("japan_raw.json", ["nagoya", "osaka", "kobe", "tateyama", "kuwana", "suzuka"], "Japan")
-    malaysia_records = process_file("malaysia_raw.json", ["kuala lumpur", "george town", "penang"], "Malaysia")
+    # Load Enrichment databases first
+    j_ratings, j_reviews, j_images = load_enrichment_data("Japan")
+    m_ratings, m_reviews, m_images = load_enrichment_data("Malaysia")
+    
+    # Load raw records
+    japan_records = process_file("japan_raw.json", ["nagoya", "osaka", "kobe", "tateyama", "kuwana", "suzuka"], "Japan", j_ratings, j_reviews, j_images)
+    malaysia_records = process_file("malaysia_raw.json", ["kuala lumpur", "george town", "penang"], "Malaysia", m_ratings, m_reviews, m_images)
     
     combined = japan_records + malaysia_records
+    
+    # Sort combined places so better places are ordered higher: rating score descending, then reviewsCount descending
+    combined.sort(key=lambda x: (x["rating"], x["reviewsCount"]), reverse=True)
     
     print(f"Total parsed records: {len(combined)} (Japan: {len(japan_records)}, Malaysia: {len(malaysia_records)})")
     
@@ -183,7 +269,7 @@ def main():
     with open(output_filename, "w", encoding="utf-8") as f:
         json.dump(combined, f, indent=2, ensure_ascii=False)
         
-    print(f"Successfully wrote {len(combined)} normalized records to {output_filename}!")
+    print(f"Successfully wrote {len(combined)} enriched, sorted records to {output_filename}!")
 
 if __name__ == "__main__":
     main()

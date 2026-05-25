@@ -2135,4 +2135,79 @@ select:focus {
     background-color: rgba(99, 102, 241, 0.05);
 }
 
+/* Enriched Place Card Image & Reviews styling */
+.place-card-image-wrapper {
+    width: 100%;
+    height: 140px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
+    position: relative;
+    background-color: var(--bg-primary);
+}
+
+.place-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.place-card:hover .place-card-image {
+    transform: scale(1.05);
+}
+
+/* Modal place preview section styling */
+.modal-place-preview {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border-top: 1.5px solid var(--border);
+    padding-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    text-align: left;
+}
+
+.place-preview-title {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.place-preview-image-wrapper {
+    width: 100%;
+    height: 150px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background-color: var(--bg-primary);
+}
+
+.place-preview-image-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.place-preview-reviews-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    background-color: var(--bg-card);
+    padding: 0.6rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+
+.place-preview-review-item {
+    font-size: 0.68rem;
+    font-style: italic;
+    color: var(--text-secondary);
+    line-height: 1.35;
+    border-left: 2.5px solid var(--accent);
+    padding-left: 0.4rem;
+}
+
 
