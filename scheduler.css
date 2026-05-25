@@ -2144,7 +2144,7 @@ select:focus {
     margin-bottom: 0.75rem;
     border: 1px solid var(--border);
     position: relative;
-    background-color: var(--bg-primary);
+    background-color: rgba(99, 102, 241, 0.08); /* Modern soft lavender placeholder */
 }
 
 .place-card-image {
@@ -2208,6 +2208,11 @@ select:focus {
     line-height: 1.35;
     border-left: 2.5px solid var(--accent);
     padding-left: 0.4rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 

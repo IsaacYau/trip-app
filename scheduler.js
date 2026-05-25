@@ -460,7 +460,7 @@ function createPlaceCardElement(p) {
 
     const imageHtml = p.imageUrl ? `
         <div class="place-card-image-wrapper">
-            <img src="${p.imageUrl}" alt="${p.name}" class="place-card-image" onerror="this.parentElement.style.display='none'">
+            <img src="${p.imageUrl}" alt="${p.name}" class="place-card-image" loading="lazy" decoding="async" onerror="this.parentElement.style.display='none'">
         </div>
     ` : "";
 
@@ -532,6 +532,7 @@ if (typeof document !== 'undefined') {
         };
 
         let placesDatabase = [];
+        let placesCurrentPage = 1;
 
         const monthNames = [
             "January", "February", "March", "April", "May", "June",
@@ -1594,20 +1595,43 @@ if (typeof document !== 'undefined') {
                 chips.forEach(c => c.classList.remove("active"));
                 chip.classList.add("active");
                 activeCategoryFilter = chip.getAttribute("data-category");
+                placesCurrentPage = 1; // Reset pagination
                 renderPlacesGrid();
             });
         });
 
-        placesSearch.addEventListener("input", renderPlacesGrid);
-        placesCitySelect.addEventListener("change", renderPlacesGrid);
+        placesSearch.addEventListener("input", () => {
+            placesCurrentPage = 1; // Reset pagination
+            renderPlacesGrid();
+        });
+        
+        placesCitySelect.addEventListener("change", () => {
+            placesCurrentPage = 1; // Reset pagination
+            renderPlacesGrid();
+        });
 
         function renderPlacesGrid() {
             placesGrid.innerHTML = "";
+            const pagContainer = document.getElementById("places-pagination-container");
+            if (pagContainer) pagContainer.innerHTML = "";
+
             if (state.destination === "china") {
                 placesGrid.innerHTML = `<div class="placeholder-card card" style="grid-column:1/-1;"><div class="placeholder-icon"><i data-lucide="compass"></i></div><h3>Shenzhen Places Ignored</h3><p>Didi transport ride-hailing is used in Shenzhen. Places lookup ignored.</p></div>`;
                 if (window.lucide) lucide.createIcons();
                 return;
             }
+
+            // Non-blocking loading screen spinner/text
+            if (placesDatabase.length === 0) {
+                placesGrid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1; text-align: center; padding: 2rem 0;">
+                        <div class="loading-spinner" style="border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: var(--accent); animation: spin 1s linear infinite; margin: 0 auto 1rem auto;"></div>
+                        <p style="font-weight: 700; color: var(--text-secondary);">Loading places...</p>
+                    </div>
+                `;
+                return;
+            }
+
             const query = placesSearch.value.toLowerCase().trim();
             const cityFilter = placesCitySelect.value;
             const countryFilter = state.destination === "japan" ? "Japan" : "Malaysia";
@@ -1628,7 +1652,27 @@ if (typeof document !== 'undefined') {
                 return;
             }
 
-            filtered.forEach(p => placesGrid.appendChild(createPlaceCardElement(p)));
+            // Pagination chunking: render 12 initially, and 12 more on 'Load More'
+            const visibleCount = placesCurrentPage * 12;
+            const visible = filtered.slice(0, visibleCount);
+
+            visible.forEach(p => placesGrid.appendChild(createPlaceCardElement(p)));
+            
+            if (filtered.length > visible.length) {
+                if (pagContainer) {
+                    pagContainer.innerHTML = `
+                        <button id="load-more-places-btn" class="btn btn-accent" style="font-weight: 750; letter-spacing: 0.5px;">
+                            <i data-lucide="download-cloud" style="width: 16px; height: 16px; margin-right: 6px; vertical-align: middle;"></i>
+                            Load More (Beware Roaming Data Usage)
+                        </button>
+                    `;
+                    document.getElementById("load-more-places-btn").addEventListener("click", () => {
+                        placesCurrentPage++;
+                        renderPlacesGrid();
+                    });
+                }
+            }
+
             if (window.lucide) lucide.createIcons();
         }
 
