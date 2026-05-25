@@ -43,7 +43,8 @@ function validateActivityInput(title) {
 }
 
 function validateTimeSlotInput(start, end) {
-    if (!start || !end) return false;
+    if (!start) return false;
+    if (!end) return true; // Optional end time is valid
     const [startH, startM] = start.split(":").map(Number);
     const [endH, endM] = end.split(":").map(Number);
     if (startH < endH) return true;
@@ -53,14 +54,14 @@ function validateTimeSlotInput(start, end) {
 
 function hasTimeConflict(activities, day, start, end, excludeId = null) {
     const startMin = timeToMinutes(start);
-    const endMin = timeToMinutes(end);
+    const endMin = end ? timeToMinutes(end) : (startMin + 30);
     
     return activities.find(act => {
         if (act.day !== day) return false;
         if (excludeId && act.id === excludeId) return false;
         
         const actStart = timeToMinutes(act.timeStart);
-        const actEnd = timeToMinutes(act.timeEnd);
+        const actEnd = act.timeEnd ? timeToMinutes(act.timeEnd) : (actStart + 30);
         
         return Math.max(startMin, actStart) < Math.min(endMin, actEnd);
     }) || null;
@@ -791,40 +792,87 @@ if (typeof document !== 'undefined') {
                 `;
             }
 
+            // Beautiful modern pastel background colors dictionary
+            const categoryColors = {
+                Food: { bg: "#FEF9C3", border: "#CA8A04", text: "#713F12" }, // Pastel Yellow
+                Sights: { bg: "#E0F2FE", border: "#0EA5E9", text: "#0C4A6E" }, // Pastel Blue
+                Shopping: { bg: "#F3E8FF", border: "#A855F7", text: "#581C87" }, // Pastel Purple
+                Entertainment: { bg: "#FEE2E2", border: "#EF4444", text: "#7F1D1D" } // Pastel Red
+            };
+            const defaultColors = { bg: "#E0F2FE", border: "#0EA5E9", text: "#0C4A6E" };
+
             // Generate Draggable Visual Activity Blocks
             let blocksHtml = "";
             dayActs.forEach(act => {
                 const catClass = act.category ? `cat-${act.category.toLowerCase()}` : "cat-sights";
+                const colors = categoryColors[act.category] || defaultColors;
+
                 const startM = timeToMinutes(act.timeStart);
-                const endM = timeToMinutes(act.timeEnd);
-                const dur = endM - startM;
+                const [startHour, startMinute] = act.timeStart.split(":").map(Number);
+                const top = (startHour * 60) + startMinute;
 
-                const top = startM; // 1px = 1 min
-                const height = Math.max(dur, 40); // At least 40px height for text visibility
+                let height = 30; // fallback default height if end time not set
+                if (act.timeEnd) {
+                    const endM = timeToMinutes(act.timeEnd);
+                    const dur = endM - startM;
+                    if (dur > 0) {
+                        height = dur;
+                    }
+                }
 
-                const reminderIcon = act.reminder ? `<i data-lucide="bell" style="width:10px; height:10px; color: var(--danger);"></i>` : "";
+                const reminderIcon = act.reminder ? `<i data-lucide="bell" style="width: 10px; height: 10px; color: #EF4444; margin-left: 2px;"></i>` : "";
+                const isShort = height <= 45;
+                const timeText = act.timeEnd ? `${act.timeStart} - ${act.timeEnd}` : act.timeStart;
 
-                blocksHtml += `
-                    <div class="time-block-activity ${catClass}" 
-                         style="top: ${top}px; height: ${height}px;" 
-                         draggable="true" 
-                         data-id="${act.id}"
-                         ondragstart="activityDragStartHandler(event)">
-                        <div class="time-block-title">${act.title}</div>
-                        <div class="time-block-time">
-                            <i data-lucide="clock"></i>
-                            <span>${act.timeStart} - ${act.timeEnd}</span>
+                let blockContent = "";
+                if (isShort) {
+                    // Google Calendar style compact layout for short events
+                    blockContent = `
+                        <div class="time-block-compact" style="display: flex; align-items: center; justify-content: space-between; height: 100%; width: 100%;">
+                            <div class="time-block-title" style="color: ${colors.text}; font-size: 0.7rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 4px;">
+                                ${act.title}
+                            </div>
+                            <div class="time-block-time" style="color: ${colors.text}; font-size: 0.6rem; font-weight: 700; white-space: nowrap; opacity: 0.85; margin-right: 32px;">
+                                ${act.timeStart}
+                            </div>
+                        </div>
+                        <div class="time-block-actions" style="top: 2px; right: 2px;">
+                            <button class="time-block-btn" style="color: ${colors.text}; padding: 0;" onclick="event.stopPropagation(); editActivityHandler('${act.id}')">
+                                <i data-lucide="edit-3" style="width: 10px; height: 10px;"></i>
+                            </button>
+                            <button class="time-block-btn" style="color: ${colors.text}; padding: 0;" onclick="event.stopPropagation(); deleteActivityHandler('${act.id}')">
+                                <i data-lucide="trash-2" style="width: 10px; height: 10px;"></i>
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    // Regular full height event layout
+                    blockContent = `
+                        <div class="time-block-title" style="color: ${colors.text}; font-weight: 800; font-size: 0.75rem;">${act.title}</div>
+                        <div class="time-block-time" style="color: ${colors.text}; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; gap: 0.2rem;">
+                            <i data-lucide="clock" style="width: 10px; height: 10px; color: ${colors.text};"></i>
+                            <span>${timeText}</span>
                             ${reminderIcon}
                         </div>
-                        ${act.location ? `<div class="time-block-loc">📍 ${act.location.split(",")[0]}</div>` : ""}
+                        ${act.location ? `<div class="time-block-loc" style="color: ${colors.text}; font-size: 0.65rem; opacity: 0.95;">📍 ${act.location.split(",")[0]}</div>` : ""}
                         <div class="time-block-actions">
-                            <button class="time-block-btn" onclick="event.stopPropagation(); editActivityHandler('${act.id}')">
+                            <button class="time-block-btn" style="color: ${colors.text}" onclick="event.stopPropagation(); editActivityHandler('${act.id}')">
                                 <i data-lucide="edit-3"></i>
                             </button>
-                            <button class="time-block-btn" onclick="event.stopPropagation(); deleteActivityHandler('${act.id}')">
+                            <button class="time-block-btn" style="color: ${colors.text}" onclick="event.stopPropagation(); deleteActivityHandler('${act.id}')">
                                 <i data-lucide="trash-2"></i>
                             </button>
                         </div>
+                    `;
+                }
+
+                blocksHtml += `
+                    <div class="time-block-activity ${catClass}" 
+                         style="position: absolute; left: 65px; right: 10px; border-radius: var(--radius-sm); z-index: 10; overflow: hidden; text-align: left; top: ${top}px; height: ${height}px; background-color: ${colors.bg}; border-left: 4px solid ${colors.border}; border-top: 1px solid rgba(0,0,0,0.05); border-right: 1px solid rgba(0,0,0,0.05); border-bottom: 1px solid rgba(0,0,0,0.05); color: ${colors.text}; ${isShort ? 'padding: 2px 6px; justify-content: center;' : ''}" 
+                         draggable="true" 
+                         data-id="${act.id}"
+                         ondragstart="activityDragStartHandler(event)">
+                        ${blockContent}
                     </div>
                 `;
             });
@@ -906,7 +954,7 @@ if (typeof document !== 'undefined') {
             dropMinutes = Math.round(dropMinutes / 15) * 15;
             dropMinutes = Math.max(0, Math.min(1440, dropMinutes));
 
-            const duration = timeToMinutes(act.timeEnd) - timeToMinutes(act.timeStart);
+            const duration = act.timeEnd ? (timeToMinutes(act.timeEnd) - timeToMinutes(act.timeStart)) : 30;
             let newStart = dropMinutes;
             if (newStart + duration > 1440) {
                 newStart = 1440 - duration;
@@ -916,14 +964,16 @@ if (typeof document !== 'undefined') {
             const newEndTimeStr = minutesToTime(newStart + duration);
 
             // Time conflict check
-            const conflict = hasTimeConflict(state.activities, act.day, newStartTimeStr, newEndTimeStr, act.id);
+            const conflict = hasTimeConflict(state.activities, act.day, newStartTimeStr, act.timeEnd ? newEndTimeStr : "", act.id);
             if (conflict) {
                 alert(`Time Conflict: Shifting "${act.title}" overlaps with "${conflict.title}". Drop rejected.`);
                 return;
             }
 
             act.timeStart = newStartTimeStr;
-            act.timeEnd = newEndTimeStr;
+            if (act.timeEnd) {
+                act.timeEnd = newEndTimeStr;
+            }
 
             saveActivitiesToStorage();
             generateCalendar();
