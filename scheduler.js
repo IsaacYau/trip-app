@@ -780,15 +780,22 @@ if (typeof document !== 'undefined') {
 
             const dayActs = state.activities.filter(a => a.day === state.selectedDay).sort((a, b) => timeToMinutes(a.timeStart) - timeToMinutes(b.timeStart));
 
-            // Generate 24 Hour rows
-            let hourRowsHtml = "";
+            // Generate Left Column Time Labels (50px fixed width)
+            let hourLabelsHtml = "";
             for (let h = 0; h < 24; h++) {
                 const padH = String(h).padStart(2, '0');
-                hourRowsHtml += `
-                    <div class="hour-row" style="top: ${h * 60}px;">
-                        <span class="hour-label">${padH}:00</span>
-                        <div class="hour-line"></div>
+                hourLabelsHtml += `
+                    <div class="hour-label-row" style="top: ${h * 60}px;">
+                        <span class="hour-label-text">${padH}:00</span>
                     </div>
+                `;
+            }
+
+            // Generate Right Column Visual Hour Grid Lines (z-index: 1)
+            let hourGridLinesHtml = "";
+            for (let h = 0; h < 24; h++) {
+                hourGridLinesHtml += `
+                    <div class="hour-grid-line" style="top: ${h * 60}px;"></div>
                 `;
             }
 
@@ -801,7 +808,7 @@ if (typeof document !== 'undefined') {
             };
             const defaultColors = { bg: "#E0F2FE", border: "#0EA5E9", text: "#0C4A6E" };
 
-            // Generate Draggable Visual Activity Blocks
+            // Generate Draggable Visual Activity Blocks (z-index: 10)
             let blocksHtml = "";
             dayActs.forEach(act => {
                 const catClass = act.category ? `cat-${act.category.toLowerCase()}` : "cat-sights";
@@ -811,14 +818,16 @@ if (typeof document !== 'undefined') {
                 const [startHour, startMinute] = act.timeStart.split(":").map(Number);
                 const top = (startHour * 60) + startMinute;
 
-                let height = 30; // fallback default height if end time not set
+                // Math & Absolute Positioning with Minimum Height Fix
+                let durationInMinutes = 30; // fallback default height if end time not set
                 if (act.timeEnd) {
                     const endM = timeToMinutes(act.timeEnd);
                     const dur = endM - startM;
                     if (dur > 0) {
-                        height = dur;
+                        durationInMinutes = dur;
                     }
                 }
+                const height = Math.max(durationInMinutes, 25); // Enforce at least 25px for readability of short activities
 
                 const reminderIcon = act.reminder ? `<i data-lucide="bell" style="width: 10px; height: 10px; color: #EF4444; margin-left: 2px;"></i>` : "";
                 const isShort = height <= 45;
@@ -868,7 +877,7 @@ if (typeof document !== 'undefined') {
 
                 blocksHtml += `
                     <div class="time-block-activity ${catClass}" 
-                         style="position: absolute; left: 65px; right: 10px; border-radius: var(--radius-sm); z-index: 10; overflow: hidden; text-align: left; top: ${top}px; height: ${height}px; background-color: ${colors.bg}; border-left: 4px solid ${colors.border}; border-top: 1px solid rgba(0,0,0,0.05); border-right: 1px solid rgba(0,0,0,0.05); border-bottom: 1px solid rgba(0,0,0,0.05); color: ${colors.text}; ${isShort ? 'padding: 2px 6px; justify-content: center;' : ''}" 
+                         style="top: ${top}px; height: ${height}px; background-color: ${colors.bg}; border-left: 4px solid ${colors.border}; border-top: 1px solid rgba(0,0,0,0.05); border-right: 1px solid rgba(0,0,0,0.05); border-bottom: 1px solid rgba(0,0,0,0.05); color: ${colors.text}; ${isShort ? 'padding: 2px 6px; justify-content: center;' : ''}" 
                          draggable="true" 
                          data-id="${act.id}"
                          ondragstart="activityDragStartHandler(event)">
@@ -877,15 +886,22 @@ if (typeof document !== 'undefined') {
                 `;
             });
 
-            // Assemble Full Grid
+            // Assemble Full Grid using Flexbox Two-Column Layout
             placeInfo.innerHTML = `
                 <div class="calendar-day-view" id="day-grid-viewport">
-                    <div class="time-grid-container" id="day-grid-container"
-                         ondragover="gridDragOverHandler(event)" 
-                         ondragleave="gridDragLeaveHandler(event)"
-                         ondrop="gridDropHandler(event)">
-                        ${hourRowsHtml}
-                        ${blocksHtml}
+                    <div class="day-view-flex-container">
+                        <!-- Left Column (Time Labels) -->
+                        <div class="day-view-time-labels">
+                            ${hourLabelsHtml}
+                        </div>
+                        <!-- Right Column (Events Board) -->
+                        <div class="day-view-events-board" id="day-grid-container"
+                             ondragover="gridDragOverHandler(event)" 
+                             ondragleave="gridDragLeaveHandler(event)"
+                             ondrop="gridDropHandler(event)">
+                            ${hourGridLinesHtml}
+                            ${blocksHtml}
+                        </div>
                     </div>
                 </div>
             `;
