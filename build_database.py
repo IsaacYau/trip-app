@@ -259,8 +259,8 @@ def main():
     
     combined = japan_records + malaysia_records
     
-    # Sort combined places so better places are ordered higher: rating score descending, then reviewsCount descending
-    combined.sort(key=lambda x: (x["rating"], x["reviewsCount"]), reverse=True)
+    # Sort combined places so better places are ordered higher: reviewsCount descending, then rating score descending
+    combined.sort(key=lambda x: (x.get("reviewsCount") or 0, x.get("rating") or 0.0), reverse=True)
     
     print(f"Total parsed records: {len(combined)} (Japan: {len(japan_records)}, Malaysia: {len(malaysia_records)})")
     

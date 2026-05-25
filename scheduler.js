@@ -1572,6 +1572,15 @@ if (typeof document !== 'undefined') {
                 // Loaded static fallback
                 placesDatabase = curatingFallbackDb();
             }
+            // Sort primarily by total reviewsCount descending, and secondarily by rating score descending
+            placesDatabase.sort((a, b) => {
+                const countA = a.reviewsCount || 0;
+                const countB = b.reviewsCount || 0;
+                if (countB !== countA) {
+                    return countB - countA;
+                }
+                return (b.rating || 0) - (a.rating || 0);
+            });
             populateCityDropdown();
             renderPlacesGrid();
         }
