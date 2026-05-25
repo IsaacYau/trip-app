@@ -3,11 +3,19 @@
 // -------------------------------------------------------------------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
-import { firebaseConfig } from "./config.js";
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
+// Load configuration synchronously from window.firebaseConfig
+const firebaseConfig = typeof window !== 'undefined' ? window.firebaseConfig : null;
+
+let app = null;
+let auth = null;
+let provider = null;
+
+if (firebaseConfig && firebaseConfig.apiKey) {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    provider = new GoogleAuthProvider();
+}
 
 // -------------------------------------------------------------------------
 // PURE LOGICAL UTILITIES (Outside DOM wrapper for unit-testability)
@@ -23,6 +31,40 @@ const FX_RATES = {
     CNY: 1.15,
     MYR: 2.0
 };
+
+function timeToMinutes(timeStr) {
+    if (!timeStr) return 0;
+    const [h, m] = timeStr.split(":").map(Number);
+    return h * 60 + m;
+}
+
+function validateActivityInput(title) {
+    return typeof title === "string" && title.trim().length > 0;
+}
+
+function validateTimeSlotInput(start, end) {
+    if (!start || !end) return false;
+    const [startH, startM] = start.split(":").map(Number);
+    const [endH, endM] = end.split(":").map(Number);
+    if (startH < endH) return true;
+    if (startH === endH && startM < endM) return true;
+    return false;
+}
+
+function hasTimeConflict(activities, day, start, end, excludeId = null) {
+    const startMin = timeToMinutes(start);
+    const endMin = timeToMinutes(end);
+    
+    return activities.find(act => {
+        if (act.day !== day) return false;
+        if (excludeId && act.id === excludeId) return false;
+        
+        const actStart = timeToMinutes(act.timeStart);
+        const actEnd = timeToMinutes(act.timeEnd);
+        
+        return Math.max(startMin, actStart) < Math.min(endMin, actEnd);
+    }) || null;
+}
 
 function convertToHkd(amount, currency) {
     const rate = FX_RATES[currency] || 1.0;
@@ -242,6 +284,208 @@ function calculateDebtSettlement(expenses) {
 }
 
 
+function curatingFallbackDb() {
+    return [
+        {
+            "name": "Nagoya Castle",
+            "city": "Nagoya",
+            "country": "Japan",
+            "category": "Sights",
+            "rating": 4.5,
+            "reviewsCount": 1200,
+            "coordinates": { "lat": 35.1855, "lng": 136.9000 },
+            "price_local": 500,
+            "currency": "JPY",
+            "price_hkd": 25.00,
+            "price_level": "$",
+            "street": "1-1 Honmaru, Naka Ward"
+        },
+        {
+            "name": "Osu Shopping Street",
+            "city": "Nagoya",
+            "country": "Japan",
+            "category": "Shopping",
+            "rating": 4.2,
+            "reviewsCount": 850,
+            "coordinates": { "lat": 35.1593, "lng": 136.9029 },
+            "price_local": 1500,
+            "currency": "JPY",
+            "price_hkd": 75.00,
+            "price_level": "$$",
+            "street": "3 Chome-45 Osu, Naka Ward"
+        },
+        {
+            "name": "Atsuta Jingu",
+            "city": "Nagoya",
+            "country": "Japan",
+            "category": "Sights",
+            "rating": 4.4,
+            "reviewsCount": 980,
+            "coordinates": { "lat": 35.1257, "lng": 136.9091 },
+            "price_local": 0,
+            "currency": "JPY",
+            "price_hkd": 0.00,
+            "price_level": "Free",
+            "street": "1 Chome-1-1 Jingu, Atsuta Ward"
+        },
+        {
+            "name": "Nagoya Ramen Street",
+            "city": "Nagoya",
+            "country": "Japan",
+            "category": "Food",
+            "rating": 4.3,
+            "reviewsCount": 420,
+            "coordinates": { "lat": 35.1706, "lng": 136.9067 },
+            "price_local": 1200,
+            "currency": "JPY",
+            "price_hkd": 60.00,
+            "price_level": "$$",
+            "street": "Nagoya Station JR Towers"
+        },
+        {
+            "name": "Dotonbori Glico Sign",
+            "city": "Osaka",
+            "country": "Japan",
+            "category": "Sights",
+            "rating": 4.6,
+            "reviewsCount": 3500,
+            "coordinates": { "lat": 34.6690, "lng": 135.5013 },
+            "price_local": 0,
+            "currency": "JPY",
+            "price_hkd": 0.00,
+            "price_level": "Free",
+            "street": "Chuo Ward, Shinsaibashisuji"
+        },
+        {
+            "name": "Kobe Harborland",
+            "city": "Kobe",
+            "country": "Japan",
+            "category": "Sights",
+            "rating": 4.4,
+            "reviewsCount": 1800,
+            "coordinates": { "lat": 34.6796, "lng": 135.1847 },
+            "price_local": 0,
+            "currency": "JPY",
+            "price_hkd": 0.00,
+            "price_level": "Free",
+            "street": "Higashikawasaki-cho, Chuo Ward"
+        },
+        {
+            "name": "Petronas Twin Towers",
+            "city": "Kuala Lumpur",
+            "country": "Malaysia",
+            "category": "Sights",
+            "rating": 4.7,
+            "reviewsCount": 5400,
+            "coordinates": { "lat": 3.1578, "lng": 101.7120 },
+            "price_local": 80,
+            "currency": "MYR",
+            "price_hkd": 160.00,
+            "price_level": "$$",
+            "street": "Kuala Lumpur City Centre"
+        },
+        {
+            "name": "Jalan Alor Food Street",
+            "city": "Kuala Lumpur",
+            "country": "Malaysia",
+            "category": "Food",
+            "rating": 4.3,
+            "reviewsCount": 2400,
+            "coordinates": { "lat": 3.1456, "lng": 101.7088 },
+            "price_local": 30,
+            "currency": "MYR",
+            "price_hkd": 60.00,
+            "price_level": "$",
+            "street": "Jalan Alor, Bukit Bintang"
+        },
+        {
+            "name": "Penang Hill Funicular",
+            "city": "George Town",
+            "country": "Malaysia",
+            "category": "Sights",
+            "rating": 4.5,
+            "reviewsCount": 1600,
+            "coordinates": { "lat": 5.4084, "lng": 100.2774 },
+            "price_local": 30,
+            "currency": "MYR",
+            "price_hkd": 60.00,
+            "price_level": "$$",
+            "street": "Air Itam, Penang Island"
+        }
+    ];
+}
+
+function createPlaceCardElement(p) {
+    if (typeof document === 'undefined') return null;
+    const card = document.createElement("div");
+    card.className = "place-card card";
+
+    const catClass = p.category ? p.category.toLowerCase() : "food";
+    
+    let ratingHtml = "";
+    let localPriceHtml = "";
+    if (p.country === "Japan") {
+        ratingHtml = `
+            <div class="rating-platform-badge tabelog-badge">
+                <span class="platform-logo">Tabelog 食べログ</span>
+                <span class="tabelog-score">${p.rating.toFixed(1)}</span>
+            </div>
+        `;
+        localPriceHtml = `JPY ${p.price_local}`;
+    } else if (p.country === "Malaysia") {
+        ratingHtml = `
+            <div class="rating-platform-badge openrice-badge">
+                <span class="platform-logo">TripAdvisor</span>
+                <span class="openrice-score">★ ${p.rating.toFixed(1)}</span>
+            </div>
+        `;
+        localPriceHtml = `MYR ${p.price_local}`;
+    } else {
+        ratingHtml = `
+            <div class="rating-platform-badge dianping-badge">
+                <span class="platform-logo">Dianping</span>
+                <span class="dianping-score">★ ${p.rating.toFixed(1)}</span>
+            </div>
+        `;
+        localPriceHtml = `CNY ${p.price_local}`;
+    }
+
+    card.innerHTML = `
+        <div class="place-header">
+            <h4 class="place-title">${p.name}</h4>
+            <span class="place-cat-badge ${catClass}">${p.category || "Food"}</span>
+        </div>
+        <div class="place-city-label">
+            <i data-lucide="map-pin" style="width:12px; height:12px;"></i>
+            <span>${p.city}, ${p.street}</span>
+        </div>
+        ${ratingHtml}
+        <div class="place-details-row">
+            <span>Local Cost:</span>
+            <span>${localPriceHtml}</span>
+        </div>
+        <div class="place-details-row">
+            <span>Est. Base Cost:</span>
+            <span class="place-price-hkd">HKD $${p.price_hkd.toFixed(2)}</span>
+        </div>
+        <div class="place-details-row">
+            <span>Price Level:</span>
+            <span>${p.price_level}</span>
+        </div>
+        <div class="place-actions">
+            <button class="btn btn-secondary btn-sm" onclick="addPlaceToExpenseHandler('${p.name.replace(/'/g, "\\'")}', ${p.price_hkd}, '${p.category}')">
+                <i data-lucide="wallet" style="width:12px; height:12px; margin-right:2px;"></i> Split Cost
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="addPlaceToActivityHandler('${p.name.replace(/'/g, "\\'")}', '${p.street.replace(/'/g, "\\'")}')">
+                <i data-lucide="calendar" style="width:12px; height:12px; margin-right:2px;"></i> Add Route
+            </button>
+        </div>
+    `;
+    if (typeof window !== 'undefined' && window.lucide) window.lucide.createIcons();
+    return card;
+}
+
+
 // -------------------------------------------------------------------------
 // DOM WRAPPER (Browser environment only)
 // -------------------------------------------------------------------------
@@ -264,6 +508,8 @@ if (typeof document !== 'undefined') {
                 Charlie: { JPY: 2000, MYR: 50, CNY: 100, logs: [] }
             }
         };
+
+        let placesDatabase = [];
 
         const monthNames = [
             "January", "February", "March", "April", "May", "June",
@@ -437,10 +683,12 @@ if (typeof document !== 'undefined') {
         });
 
         function updateThemeIcon(theme) {
-            const icon = themeToggleBtn.querySelector("i");
-            if (icon) {
-                if (theme === "dark") icon.setAttribute("data-lucide", "sun");
-                else icon.setAttribute("data-lucide", "moon");
+            if (themeToggleBtn) {
+                if (theme === "dark") {
+                    themeToggleBtn.innerHTML = '<i data-lucide="sun"></i>';
+                } else {
+                    themeToggleBtn.innerHTML = '<i data-lucide="moon"></i>';
+                }
             }
             if (window.lucide) lucide.createIcons();
         }
@@ -560,7 +808,7 @@ if (typeof document !== 'undefined') {
         };
 
         // Modals
-        function openModal(day, activity = null) {
+        function openModal(day, activity = null, prefill = null) {
             modalDayInput.value = day;
             activityForm.reset();
             if (activity) {
@@ -578,6 +826,12 @@ if (typeof document !== 'undefined') {
                 modalTitle.textContent = "Add Activity";
                 modalActivityIdInput.value = "";
                 reminderTimeContainer.classList.remove("show");
+                if (prefill) {
+                    activityTitleInput.value = prefill.title || "";
+                    activityLocationInput.value = prefill.location || "";
+                    activityStartInput.value = prefill.timeStart || "";
+                    activityEndInput.value = prefill.timeEnd || "";
+                }
             }
             activityModal.classList.add("open");
         }
@@ -605,7 +859,7 @@ if (typeof document !== 'undefined') {
             if (!validateActivityInput(title)) { alert("Please enter a valid title."); return; }
             if (!validateTimeSlotInput(start, end)) { alert("Start time must be before end time."); return; }
             
-            const conflict = hasTimeConflict(day, start, end, modalActivityIdInput.value ? id : null);
+            const conflict = hasTimeConflict(state.activities, day, start, end, modalActivityIdInput.value ? id : null);
             if (conflict) { alert(`Time Conflict with "${conflict.title}"!`); return; }
 
             const newAct = { id, day, title, timeStart: start, timeEnd: end, location, reminder, reminderOffset };
@@ -773,43 +1027,49 @@ if (typeof document !== 'undefined') {
         // -------------------------------------------------------------------------
         // FIREBASE GOOGLE AUTHENTICATION SYSTEM
         // -------------------------------------------------------------------------
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                state.firebaseUser = user;
-                // Sync Firebase profile name/email to RoamReady state
-                state.activeUser = user.displayName || user.email || "FirebaseUser";
-                localStorage.setItem("travelActiveUser", state.activeUser);
+        if (auth && provider) {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    state.firebaseUser = user;
+                    // Sync Firebase profile name/email to RoamReady state
+                    state.activeUser = user.displayName || user.email || "FirebaseUser";
+                    localStorage.setItem("travelActiveUser", state.activeUser);
 
-                auth0LoginBtn.style.display = "none";
-                auth0ProfileDiv.style.display = "flex";
-                auth0UserAvatar.src = user.photoURL || "";
-                
-                updateProfileUI();
-            } else {
-                state.firebaseUser = null;
-                auth0LoginBtn.style.display = "inline-flex";
-                auth0ProfileDiv.style.display = "none";
-            }
-        });
+                    auth0LoginBtn.style.display = "none";
+                    auth0ProfileDiv.style.display = "flex";
+                    auth0UserAvatar.src = user.photoURL || "";
+                    
+                    updateProfileUI();
+                } else {
+                    state.firebaseUser = null;
+                    auth0LoginBtn.style.display = "inline-flex";
+                    auth0ProfileDiv.style.display = "none";
+                }
+            });
 
-        auth0LoginBtn.addEventListener("click", async () => {
-            try {
-                await signInWithPopup(auth, provider);
-            } catch (err) {
-                console.error("Firebase Login Error:", err);
-                alert("Login Error: " + err.message);
-            }
-        });
+            auth0LoginBtn.addEventListener("click", async () => {
+                try {
+                    await signInWithPopup(auth, provider);
+                } catch (err) {
+                    console.error("Firebase Login Error:", err);
+                    alert("Login Error: " + err.message);
+                }
+            });
 
-        auth0LogoutBtn.addEventListener("click", async () => {
-            try {
-                state.firebaseUser = null;
-                await signOut(auth);
-            } catch (err) {
-                console.error("Firebase Logout Error:", err);
-                alert("Logout Error: " + err.message);
-            }
-        });
+            auth0LogoutBtn.addEventListener("click", async () => {
+                try {
+                    state.firebaseUser = null;
+                    await signOut(auth);
+                } catch (err) {
+                    console.error("Firebase Logout Error:", err);
+                    alert("Logout Error: " + err.message);
+                }
+            });
+        } else {
+            auth0LoginBtn.addEventListener("click", () => {
+                alert("Firebase Authentication is not configured.");
+            });
+        }
 
         icPassengerSelect.addEventListener("change", (e) => {
             state.mappedRole = e.target.value;
@@ -1000,7 +1260,7 @@ if (typeof document !== 'undefined') {
                 if (window.lucide) lucide.createIcons();
                 return;
             }
-            const query = placesSearch.value.toLowerCase().strip();
+            const query = placesSearch.value.toLowerCase().trim();
             const cityFilter = placesCitySelect.value;
             const countryFilter = state.destination === "japan" ? "Japan" : "Malaysia";
 
@@ -1234,6 +1494,42 @@ if (typeof document !== 'undefined') {
             }
         };
 
+        window.addPlaceToExpenseHandler = function(name, priceHkd, category) {
+            if (!state.firebaseUser) {
+                alert("🔒 Authentication Required: You must log in via Google to add expenses to the group wallet.");
+                return;
+            }
+            const exp = {
+                id: `exp-${Date.now()}`,
+                title: `Split: ${name}`,
+                type: "global",
+                amount: priceHkd,
+                currency: "HKD",
+                payer: state.activeUser || "Alice",
+                category: category || "Other",
+                date: new Date().toLocaleDateString()
+            };
+            state.expenses.push(exp);
+            saveExpensesToStorage();
+            renderLedger();
+            renderDebtSettlement();
+            updateIcEstimator();
+            alert(`Added "${name}" global expense (HKD $${priceHkd.toFixed(2)}) paid by ${state.activeUser}!`);
+        };
+
+        window.addPlaceToActivityHandler = function(name, location) {
+            if (state.selectedDay === null) {
+                alert("Please select a travel date on the calendar first!");
+                return;
+            }
+            openModal(state.selectedDay, null, {
+                title: name,
+                location: location,
+                timeStart: "12:00",
+                timeEnd: "13:00"
+            });
+        };
+        
         // Passenger IC Card Estimates
         function renderRechargeButtons() {
             icRechargeRow.innerHTML = "";
@@ -1379,7 +1675,16 @@ if (typeof document !== 'undefined') {
         // Bootstrap load
         loadAllData();
         updateProfileUI();
+
+        // Default to current system date
+        const todayDateObj = new Date();
+        state.currentMonth = todayDateObj.getMonth();
+        state.currentYear = todayDateObj.getFullYear();
+        state.selectedDay = todayDateObj.getDate();
+
         generateCalendar();
+        selectDay(state.selectedDay);
+
         updateDestinationUI();
         fetchPlacesDb();
         renderLedger();
@@ -1403,6 +1708,12 @@ if (typeof module !== 'undefined' && module.exports) {
         findDijkstraRoute,
         calculateDebtSettlement,
         TRANSIT_NETWORKS,
-        FX_RATES
+        FX_RATES,
+        timeToMinutes,
+        validateActivityInput,
+        validateTimeSlotInput,
+        hasTimeConflict,
+        curatingFallbackDb,
+        createPlaceCardElement
     };
 }
