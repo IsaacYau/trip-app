@@ -1,6 +1,8 @@
 import json
 import os
 import random
+import time
+from deep_translator import GoogleTranslator
 
 # Seed for deterministic random generation (coordinates and prices)
 random.seed(42)
@@ -111,6 +113,15 @@ def process_file(filepath, allowed_cities, default_country, ratings_dict, review
         print(f"Error: {filepath} not found!")
         return []
     
+    cache_file = "translation_cache.json"
+    translation_cache = {}
+    if os.path.exists(cache_file):
+        with open(cache_file, "r", encoding="utf-8") as cf:
+            try:
+                translation_cache = json.load(cf)
+            except Exception:
+                translation_cache = {}
+                
     with open(filepath, "r", encoding="utf-8") as f:
         data = json.load(f)
     
@@ -226,8 +237,27 @@ def process_file(filepath, allowed_cities, default_country, ratings_dict, review
         else: # MYR
             price_hkd = round(price_local * MYR_TO_HKD, 1)
             
+        # Translate title to local language using cache or GoogleTranslator
+        cache_key = f"{country}:{title}"
+        if cache_key in translation_cache:
+            local_title = translation_cache[cache_key]
+        else:
+            local_title = title
+            try:
+                if country == "Japan":
+                    local_title = GoogleTranslator(source='auto', target='ja').translate(title)
+                    time.sleep(0.3)
+                elif country == "Malaysia":
+                    local_title = GoogleTranslator(source='auto', target='zh-TW').translate(title)
+                    time.sleep(0.3)
+                translation_cache[cache_key] = local_title
+            except Exception as e:
+                print(f"Translation failed for {title}: {e}")
+                local_title = title
+            
         records.append({
             "name": title,
+            "localTitle": local_title,
             "city": city_display,
             "country": country,
             "category": unified_category,
@@ -245,6 +275,10 @@ def process_file(filepath, allowed_cities, default_country, ratings_dict, review
             "imageUrl": image_url,
             "reviews": reviews_list
         })
+        
+    # Save cache back
+    with open(cache_file, "w", encoding="utf-8") as cf:
+        json.dump(translation_cache, cf, indent=2, ensure_ascii=False)
         
     return records
 

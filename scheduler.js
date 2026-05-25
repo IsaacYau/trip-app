@@ -1101,7 +1101,8 @@ if (typeof document !== 'undefined') {
             const cleanLoc = loc.toLowerCase().trim();
             const matchedPlace = placesDatabase.find(p => {
                 const name = p.name.toLowerCase();
-                return cleanLoc.includes(name) || name.includes(cleanLoc);
+                const localName = p.localTitle ? p.localTitle.toLowerCase() : "";
+                return cleanLoc.includes(name) || name.includes(cleanLoc) || (localName && (cleanLoc.includes(localName) || localName.includes(cleanLoc)));
             });
 
             if (matchedPlace && matchedPlace.imageUrl) {
@@ -1184,6 +1185,7 @@ if (typeof document !== 'undefined') {
 
             const matches = placesDatabase.filter(p => {
                 return (p.name && p.name.toLowerCase().includes(val)) ||
+                       (p.localTitle && p.localTitle.toLowerCase().includes(val)) ||
                        (p.street && p.street.toLowerCase().includes(val));
             });
 
@@ -1652,7 +1654,9 @@ if (typeof document !== 'undefined') {
                 if (cityFilter !== "All" && p.city !== cityFilter) return false;
                 if (activeCategoryFilter !== "All" && p.category !== activeCategoryFilter) return false;
                 if (query) {
-                    return p.name.toLowerCase().includes(query) || p.street.toLowerCase().includes(query);
+                    return p.name.toLowerCase().includes(query) || 
+                           (p.localTitle && p.localTitle.toLowerCase().includes(query)) ||
+                           p.street.toLowerCase().includes(query);
                 }
                 return true;
             });
