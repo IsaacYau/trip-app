@@ -1167,6 +1167,11 @@ select:focus {
     color: #6b21a8;
 }
 
+.place-cat-badge.entertainment {
+    background-color: #dcfce7;
+    color: #15803d;
+}
+
 .place-city-label {
     font-size: 0.75rem;
     color: var(--text-secondary);
@@ -1193,6 +1198,16 @@ select:focus {
     text-transform: uppercase;
     font-family: var(--font-heading);
     font-size: 0.7rem;
+}
+
+.universal-rating-badge {
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+}
+
+.universal-rating-badge .platform-logo {
+    color: #eab308; /* Star color */
 }
 
 /* Tabelog branding */

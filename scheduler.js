@@ -430,37 +430,25 @@ function createPlaceCardElement(p) {
 
     const catClass = p.category ? p.category.toLowerCase() : "food";
     
-    let ratingHtml = "";
     let localPriceHtml = "";
     if (p.country === "Japan") {
-        ratingHtml = `
-            <div class="rating-platform-badge tabelog-badge">
-                <span class="platform-logo">Tabelog 食べログ</span>
-                <span class="tabelog-score">${p.rating.toFixed(1)}</span>
-            </div>
-        `;
         localPriceHtml = `JPY ${p.price_local}`;
     } else if (p.country === "Malaysia") {
-        ratingHtml = `
-            <div class="rating-platform-badge openrice-badge">
-                <span class="platform-logo">TripAdvisor</span>
-                <span class="openrice-score">★ ${p.rating.toFixed(1)}</span>
-            </div>
-        `;
         localPriceHtml = `MYR ${p.price_local}`;
     } else {
-        ratingHtml = `
-            <div class="rating-platform-badge dianping-badge">
-                <span class="platform-logo">Dianping</span>
-                <span class="dianping-score">★ ${p.rating.toFixed(1)}</span>
-            </div>
-        `;
         localPriceHtml = `CNY ${p.price_local}`;
     }
 
+    const ratingHtml = `
+        <div class="rating-platform-badge universal-rating-badge">
+            <span class="platform-logo">★ Rating</span>
+            <span class="rating-score">${p.rating.toFixed(1)} (${p.reviewsCount || 0} reviews)</span>
+        </div>
+    `;
+
     const imageHtml = p.imageUrl ? `
         <div class="place-card-image-wrapper">
-            <img src="${p.imageUrl}" alt="${p.name}" class="place-card-image" loading="lazy" decoding="async" onerror="this.parentElement.style.display='none'">
+            <img src="${p.imageUrl}" referrerpolicy="no-referrer" alt="${p.name}" class="place-card-image" loading="lazy" decoding="async" onerror="this.parentElement.style.display='none'">
         </div>
     ` : "";
 
@@ -503,6 +491,16 @@ function createPlaceCardElement(p) {
             </button>
         </div>
     `;
+
+    card.addEventListener("click", (e) => {
+        if (e.target.closest("button") || e.target.closest("a") || e.target.closest(".place-actions")) {
+            return;
+        }
+        if (typeof window !== 'undefined' && typeof window.openPlaceDetailModal === 'function') {
+            window.openPlaceDetailModal(p);
+        }
+    });
+
     if (typeof window !== 'undefined' && window.lucide) window.lucide.createIcons();
     return card;
 }
@@ -1121,7 +1119,7 @@ if (typeof document !== 'undefined') {
                 previewDiv.innerHTML = `
                     <div class="place-preview-title">📍 ${matchedPlace.name}</div>
                     <div class="place-preview-image-wrapper">
-                        <img src="${matchedPlace.imageUrl}" alt="${matchedPlace.name}" onerror="this.parentElement.style.display='none'">
+                        <img src="${matchedPlace.imageUrl}" referrerpolicy="no-referrer" alt="${matchedPlace.name}" onerror="this.parentElement.style.display='none'">
                     </div>
                     ${reviewsHtml}
                 `;
@@ -1920,6 +1918,124 @@ if (typeof document !== 'undefined') {
                 timeStart: "12:00",
                 timeEnd: "13:00"
             });
+        };
+
+        const placeDetailModal = document.getElementById("place-detail-modal");
+        const closePlaceDetailModalBtn = document.getElementById("close-place-detail-modal");
+        const placeDetailTitle = document.getElementById("place-detail-title");
+        const placeDetailBody = document.getElementById("place-detail-body");
+
+        window.closePlaceDetailModal = function() {
+            if (placeDetailModal) {
+                placeDetailModal.classList.remove("open");
+            }
+        };
+
+        if (closePlaceDetailModalBtn) {
+            closePlaceDetailModalBtn.addEventListener("click", window.closePlaceDetailModal);
+        }
+
+        if (placeDetailModal) {
+            placeDetailModal.addEventListener("click", (e) => {
+                if (e.target === placeDetailModal) {
+                    window.closePlaceDetailModal();
+                }
+            });
+        }
+
+        window.openPlaceDetailModal = function(p) {
+            if (!placeDetailModal || !placeDetailTitle || !placeDetailBody) return;
+
+            placeDetailTitle.textContent = p.name;
+
+            const catClass = p.category ? p.category.toLowerCase() : "food";
+            
+            let localPriceHtml = "";
+            if (p.country === "Japan") {
+                localPriceHtml = `JPY ${p.price_local}`;
+            } else if (p.country === "Malaysia") {
+                localPriceHtml = `MYR ${p.price_local}`;
+            } else {
+                localPriceHtml = `CNY ${p.price_local}`;
+            }
+
+            const imageHtml = p.imageUrl ? `
+                <div class="place-detail-image-wrapper" style="width: 100%; height: 220px; overflow: hidden; border-radius: var(--radius-md); border: 1px solid var(--border); background-color: rgba(99, 102, 241, 0.08);">
+                    <img src="${p.imageUrl}" referrerpolicy="no-referrer" alt="${p.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.style.display='none'">
+                </div>
+            ` : "";
+
+            let reviewsHtml = "";
+            if (p.reviews && p.reviews.length > 0) {
+                const reviewItems = p.reviews.map(r => `
+                    <div class="place-detail-review-item" style="background-color: var(--bg-primary); border-left: 3px solid var(--accent); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-style: italic; color: var(--text-secondary); line-height: 1.4;">
+                        "${r}"
+                    </div>
+                `).join("");
+                reviewsHtml = `
+                    <div class="place-detail-reviews-section" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
+                        <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.25rem;">Traveller Reviews</h4>
+                        ${reviewItems}
+                    </div>
+                `;
+            } else {
+                reviewsHtml = `
+                    <div class="place-detail-reviews-section" style="margin-top: 0.5rem;">
+                        <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.25rem;">Traveller Reviews</h4>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); font-style: italic;">No reviews yet.</div>
+                    </div>
+                `;
+            }
+
+            placeDetailBody.innerHTML = `
+                ${imageHtml}
+                
+                <div class="place-detail-info-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
+                    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase;">Category</span>
+                        <div><span class="place-cat-badge ${catClass}">${p.category || "Food"}</span></div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase;">Rating</span>
+                        <div class="universal-rating-badge" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; font-weight: 700; background-color: var(--bg-primary); border: 1px solid var(--border); padding: 2px 8px; border-radius: var(--radius-sm); color: var(--text-primary);">
+                            <span style="color: #eab308;">★</span> <span>${p.rating.toFixed(1)} (${p.reviewsCount || 0} reviews)</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase;">Local Cost</span>
+                        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary);">${localPriceHtml}</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase;">Est. Base Cost</span>
+                        <span style="font-size: 0.8rem; font-weight: 700; color: var(--accent);">HKD $${p.price_hkd.toFixed(2)}</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase;">Price Level</span>
+                        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary);">${p.price_level}</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase;">Location</span>
+                        <span style="font-size: 0.75rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.25rem;">
+                            <i data-lucide="map-pin" style="width:12px; height:12px; flex-shrink: 0;"></i>
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${p.city}, ${p.street}</span>
+                        </span>
+                    </div>
+                </div>
+
+                ${reviewsHtml}
+
+                <div class="place-detail-actions" style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
+                    <button class="btn btn-secondary btn-sm" onclick="window.closePlaceDetailModal(); window.addPlaceToExpenseHandler('${p.name.replace(/'/g, "\\'")}', ${p.price_hkd}, '${p.category}')">
+                        <i data-lucide="wallet" style="width:12px; height:12px; margin-right:2px;"></i> Split Cost
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="window.closePlaceDetailModal(); window.addPlaceToActivityHandler('${p.name.replace(/'/g, "\\'")}', '${p.street.replace(/'/g, "\\'")}')">
+                        <i data-lucide="calendar" style="width:12px; height:12px; margin-right:2px;"></i> Add Route
+                    </button>
+                </div>
+            `;
+
+            if (window.lucide) window.lucide.createIcons();
+            placeDetailModal.classList.add("open");
         };
         
         // Passenger IC Card Estimates

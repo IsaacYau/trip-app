@@ -265,6 +265,7 @@ try {
         country: "Japan",
         category: "Sights",
         rating: 4.5,
+        reviewsCount: 152,
         price_local: 500,
         price_hkd: 25.00,
         price_level: "$",
@@ -274,7 +275,7 @@ try {
     assert.ok(cardElement);
     assert.strictEqual(cardElement.className, "place-card card");
     assert.ok(cardElement.innerHTML.includes("Test Garden"));
-    assert.ok(cardElement.innerHTML.includes("Tabelog"));
+    assert.ok(cardElement.innerHTML.includes("Rating"));
     console.log("✅ Place card element generation tests passed!");
 
     // -------------------------------------------------------------------------
