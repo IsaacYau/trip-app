@@ -531,6 +531,7 @@ if (typeof document !== 'undefined') {
 
         let placesDatabase = [];
         let placesCurrentPage = 1;
+        let gpsCurrentPage = 1;
 
         const monthNames = [
             "January", "February", "March", "April", "May", "June",
@@ -667,6 +668,7 @@ if (typeof document !== 'undefined') {
         const gpsStatusText = document.getElementById("gps-status-text");
         const gpsRecHeader = document.getElementById("gps-recommendations-header");
         const gpsRecGrid = document.getElementById("gps-recommendations");
+        const gpsPaginationContainer = document.getElementById("gps-pagination-container");
 
         // Expenses form
         const expenseForm = document.getElementById("expense-form");
@@ -1432,6 +1434,8 @@ if (typeof document !== 'undefined') {
             gpsRecHeader.style.display = "none";
             gpsRecGrid.style.display = "none";
             gpsStatusBar.style.display = "none";
+            gpsPaginationContainer.innerHTML = "";
+            gpsCurrentPage = 1;
             updateIcEstimator();
             renderRechargeButtons();
 
@@ -1685,6 +1689,8 @@ if (typeof document !== 'undefined') {
 
         gpsBtn.addEventListener("click", () => {
             if (state.destination === "china") { alert("Places ignored for China."); return; }
+            gpsCurrentPage = 1; // Reset GPS pagination
+            gpsPaginationContainer.innerHTML = "";
             if (navigator.geolocation) {
                 gpsStatusText.textContent = "Locating...";
                 gpsStatusBar.style.display = "inline-flex";
@@ -1712,7 +1718,12 @@ if (typeof document !== 'undefined') {
                 .sort((a, b) => a.distance - b.distance);
 
             gpsRecGrid.innerHTML = "";
-            ranked.slice(0, 3).forEach(place => {
+            gpsPaginationContainer.innerHTML = "";
+
+            const visibleCount = gpsCurrentPage * 3;
+            const visible = ranked.slice(0, visibleCount);
+
+            visible.forEach(place => {
                 const card = createPlaceCardElement(place);
                 const db = document.createElement("div");
                 db.className = "place-details-row";
@@ -1722,8 +1733,29 @@ if (typeof document !== 'undefined') {
                 card.insertBefore(db, card.querySelector(".place-actions"));
                 gpsRecGrid.appendChild(card);
             });
+
+            // Dynamically update header text to reflect the loaded count
+            const headerTitle = gpsRecHeader.querySelector("h3");
+            if (headerTitle) {
+                headerTitle.innerHTML = `<i data-lucide="sparkles"></i> 📍 Right Next To You (Closest ${visible.length} Gems)`;
+            }
+
             gpsRecHeader.style.display = "block";
             gpsRecGrid.style.display = "grid";
+
+            if (ranked.length > visible.length) {
+                gpsPaginationContainer.innerHTML = `
+                    <button id="load-more-gps-btn" class="btn btn-accent" style="font-weight: 750; letter-spacing: 0.5px;">
+                        <i data-lucide="download-cloud" style="width: 16px; height: 16px; margin-right: 6px; vertical-align: middle;"></i>
+                        Load More (Beware Roaming Data Usage)
+                    </button>
+                `;
+                document.getElementById("load-more-gps-btn").addEventListener("click", () => {
+                    gpsCurrentPage++;
+                    applyGpsDiscovery(lat, lng, label);
+                });
+            }
+
             if (window.lucide) lucide.createIcons();
         }
 
