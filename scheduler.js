@@ -847,6 +847,75 @@ if (typeof document !== 'undefined') {
 
             const dayActs = state.activities.filter(a => a.day === state.selectedDay).sort((a, b) => timeToMinutes(a.timeStart) - timeToMinutes(b.timeStart));
 
+            // Calculate column positioning for overlapping activities (Google Calendar style)
+            const positions = new Map(); // act.id -> { colIndex, totalCols }
+            
+            // Build overlapping sets
+            const clusters = []; // array of arrays of activities
+            dayActs.forEach(act => {
+                const actStart = timeToMinutes(act.timeStart);
+                const actEnd = act.timeEnd ? timeToMinutes(act.timeEnd) : (actStart + 30);
+                
+                // Find a cluster this activity overlaps with
+                let placed = false;
+                for (let cluster of clusters) {
+                    const overlaps = cluster.some(cAct => {
+                        const cStart = timeToMinutes(cAct.timeStart);
+                        const cEnd = cAct.timeEnd ? timeToMinutes(cAct.timeEnd) : (cStart + 30);
+                        return Math.max(actStart, cStart) < Math.min(actEnd, cEnd);
+                    });
+                    if (overlaps) {
+                        cluster.push(act);
+                        placed = true;
+                        break;
+                    }
+                }
+                if (!placed) {
+                    clusters.push([act]);
+                }
+            });
+
+            // For each cluster, assign columns
+            clusters.forEach(cluster => {
+                // Sort cluster by start time
+                cluster.sort((a, b) => timeToMinutes(a.timeStart) - timeToMinutes(b.timeStart));
+                
+                const columns = []; // array of arrays representing columns of activities
+                cluster.forEach(act => {
+                    const actStart = timeToMinutes(act.timeStart);
+                    
+                    // Find the first column where this activity doesn't overlap with the last activity in that column
+                    let colIndex = 0;
+                    let placedInCol = false;
+                    for (let i = 0; i < columns.length; i++) {
+                        const col = columns[i];
+                        const lastAct = col[col.length - 1];
+                        const lastStart = timeToMinutes(lastAct.timeStart);
+                        const lastEnd = lastAct.timeEnd ? timeToMinutes(lastAct.timeEnd) : (lastStart + 30);
+                        
+                        if (actStart >= lastEnd) {
+                            col.push(act);
+                            colIndex = i;
+                            placedInCol = true;
+                            break;
+                        }
+                    }
+                    if (!placedInCol) {
+                        columns.push([act]);
+                        colIndex = columns.length - 1;
+                    }
+                    positions.set(act.id, { colIndex, totalCols: columns.length });
+                });
+                
+                // Set the final totalCols for all activities in this cluster to be the number of columns in the cluster
+                cluster.forEach(act => {
+                    const pos = positions.get(act.id);
+                    if (pos) {
+                        pos.totalCols = columns.length;
+                    }
+                });
+            });
+
             // Generate Left Column Time Labels (50px fixed width)
             let hourLabelsHtml = "";
             for (let h = 0; h < 24; h++) {
@@ -942,9 +1011,14 @@ if (typeof document !== 'undefined') {
                     `;
                 }
 
+                const pos = positions.get(act.id) || { colIndex: 0, totalCols: 1 };
+                const colWidth = (100 - 2) / pos.totalCols;
+                const leftPercent = 1 + (pos.colIndex * colWidth);
+                const blockStyleWidth = `left: ${leftPercent}%; width: ${colWidth - 1}%; right: auto;`;
+
                 blocksHtml += `
                     <div class="time-block-activity ${catClass}" 
-                         style="top: ${top}px; height: ${height}px; background-color: ${colors.bg}; border-left: 4px solid ${colors.border}; border-top: 1px solid rgba(0,0,0,0.05); border-right: 1px solid rgba(0,0,0,0.05); border-bottom: 1px solid rgba(0,0,0,0.05); color: ${colors.text}; ${isShort ? 'padding: 2px 6px; justify-content: center;' : ''}" 
+                         style="top: ${top}px; height: ${height}px; background-color: ${colors.bg}; border-left: 4px solid ${colors.border}; border-top: 1px solid rgba(0,0,0,0.05); border-right: 1px solid rgba(0,0,0,0.05); border-bottom: 1px solid rgba(0,0,0,0.05); color: ${colors.text}; ${isShort ? 'padding: 2px 6px; justify-content: center;' : ''} ${blockStyleWidth}" 
                          draggable="true" 
                          data-id="${act.id}"
                          ondragstart="activityDragStartHandler(event)">
@@ -1235,7 +1309,9 @@ if (typeof document !== 'undefined') {
                 return;
             }
 
+            const targetCountry = state.destination === "japan" ? "Japan" : (state.destination === "china" ? "China" : "Malaysia");
             const matches = placesDatabase.filter(p => {
+                if (p.country !== targetCountry) return false;
                 return (p.name && p.name.toLowerCase().includes(val)) ||
                        (p.localTitle && p.localTitle.toLowerCase().includes(val)) ||
                        (p.street && p.street.toLowerCase().includes(val));
@@ -1299,6 +1375,7 @@ if (typeof document !== 'undefined') {
                     if (now >= alertTime && now < actTime) {
                         state.firedReminders.add(act.id);
                         showToast(`Reminder: ${act.title}`, `Starts at ${act.timeStart}!`);
+                        alert(`⏰ Reminder: "${act.title}" starts at ${act.timeStart}!`);
                     }
                 }
             });
@@ -1503,11 +1580,13 @@ if (typeof document !== 'undefined') {
                     return;
                 }
 
+                const destinationVal = document.getElementById("create-destination").value || "japan";
                 const passwordVal = isPublic ? "" : setPassword;
                 const newNetwork = {
                     owner: state.firebaseUser.uid,
                     ownerName: username,
                     password: passwordVal,
+                    destination: destinationVal,
                     members: [state.firebaseUser.uid],
                     activities: [],
                     expenses: [],
@@ -2803,6 +2882,16 @@ if (typeof document !== 'undefined') {
                         state.expenses = data.expenses || [];
                         if (data.icCards) {
                             state.icCards = data.icCards;
+                        }
+                        if (data.destination) {
+                            state.destination = data.destination.toLowerCase();
+                            localStorage.setItem("travelDestination", state.destination);
+                            const destSelect = document.getElementById("destination-select");
+                            if (destSelect) {
+                                destSelect.value = state.destination;
+                            }
+                            updateDestinationUI();
+                            saveICCardsToStorage();
                         }
 
                         generateCalendar();

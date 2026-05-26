@@ -4,3 +4,8 @@
 | task-14 | Bypass hasTimeConflict for overlaps and only flag negative durations in scheduler.js | completed | |
 | task-15 | Prevent password prompts for existing group members in Browse Network tab | completed | |
 | task-16 | Verify all changes and run TDD test suite | completed | |
+| task-17 | Move destination select dropdown to Create Group form and sync onSnapshot | completed | |
+| task-18 | Restrict autocomplete suggestions to current group destination country | completed | |
+| task-19 | Render overlapping event blocks side-by-side (fractional columns) | completed | |
+| task-20 | Add standard browser alert popups for reminders | completed | |
+| task-21 | Verify all changes and run unit tests | completed | |

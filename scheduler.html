@@ -23,7 +23,7 @@
         </div>
         <div class="header-actions">
             <div class="header-select-group">
-                <select id="destination-select" class="header-select" title="Choose Destination">
+                <select id="destination-select" class="header-select" title="Choose Destination" style="display: none;">
                     <option value="japan">🇯🇵 Japan (Nagoya/Osaka/Kobe)</option>
                     <option value="china">🇨🇳 China (Shenzhen)</option>
                     <option value="malaysia">🇲🇾 Malaysia (KL/Penang)</option>
@@ -551,6 +551,14 @@
                 <div class="form-group" style="margin-bottom: 0.75rem;">
                     <label for="create-password" style="display: block; font-size: 0.75rem; font-weight: 750; margin-bottom: 0.35rem;">Group Password *</label>
                     <input type="password" id="create-password" placeholder="Set a group password" style="width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-primary); font-size: 0.85rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0.75rem;">
+                    <label for="create-destination" style="display: block; font-size: 0.75rem; font-weight: 750; margin-bottom: 0.35rem;">Destination Country *</label>
+                    <select id="create-destination" required style="width: 100%; padding: 0.55rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-primary); font-size: 0.85rem; background-color: var(--bg-primary); color: var(--text-primary);">
+                        <option value="japan">🇯🇵 Japan (Nagoya/Osaka/Kobe)</option>
+                        <option value="china">🇨🇳 China (Shenzhen)</option>
+                        <option value="malaysia">🇲🇾 Malaysia (KL/Penang)</option>
+                    </select>
                 </div>
                 <div class="form-group checkbox-group" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.35rem;">
                     <input type="checkbox" id="create-public" style="width: auto;">
