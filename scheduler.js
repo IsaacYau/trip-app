@@ -1688,7 +1688,12 @@ if (typeof document !== 'undefined') {
 
                     const subtitle = document.createElement("span");
                     const creatorLabel = data.ownerName ? ` | Creator: ${data.ownerName}` : "";
-                    subtitle.textContent = `${data.members ? data.members.length : 1} Members${creatorLabel}`;
+                    let countryLabel = "";
+                    if (data.destination) {
+                        const d = data.destination.toLowerCase();
+                        countryLabel = ` | ${d === "japan" ? "JP" : (d === "china" ? "CN" : "ML")}`;
+                    }
+                    subtitle.textContent = `${data.members ? data.members.length : 1} Members${creatorLabel}${countryLabel}`;
                     subtitle.style.fontSize = "0.65rem";
                     subtitle.style.color = "var(--text-secondary)";
                     info.appendChild(subtitle);
@@ -1877,7 +1882,13 @@ if (typeof document !== 'undefined') {
         });
 
         function updateProfileUI() {
-            currentUserDisplay.innerHTML = `<span style="font-weight: 800; color: var(--accent);">${state.activeUser}</span>`;
+            let countryBadge = "";
+            if (state.destination) {
+                const d = state.destination.toLowerCase();
+                const code = d === "japan" ? "JP" : (d === "china" ? "CN" : "ML");
+                countryBadge = ` <span style="font-size:0.65rem; color:var(--text-secondary); background:var(--border); padding:0.15rem 0.3rem; border-radius:3px; margin-left:0.25rem; font-weight: 800;">${code}</span>`;
+            }
+            currentUserDisplay.innerHTML = `<span style="font-weight: 800; color: var(--accent);">${state.activeUser}</span>${countryBadge}`;
             
             const payerSelect = document.getElementById("expense-payer");
             if (payerSelect) {

@@ -13,3 +13,6 @@
 | task-23 | Filter place details preview in updateModalPlacePreview by destination country | completed | |
 | task-24 | Implement getDestinationNow and update checkReminders for timezone-accurate popup alert triggers | completed | |
 | task-25 | Run unit tests and verify the updates | completed | |
+| task-26 | Show JP/CN/ML in Browse Network row captions next to creator name | completed | |
+| task-27 | Show active country badge JP/CN/ML in updateProfileUI | completed | |
+| task-28 | Verify changes and run unit tests | completed | |
