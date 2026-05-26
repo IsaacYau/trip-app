@@ -3,18 +3,20 @@
 // -------------------------------------------------------------------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 
-// Load configuration synchronously from window.firebaseConfig
-const firebaseConfig = typeof window !== 'undefined' ? window.firebaseConfig : null;
+import { firebaseConfig } from "./config.js";
 
 let app = null;
 let auth = null;
 let provider = null;
+let db = null;
 
 if (firebaseConfig && firebaseConfig.apiKey) {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     provider = new GoogleAuthProvider();
+    db = getFirestore(app);
 }
 
 // -------------------------------------------------------------------------
@@ -53,18 +55,14 @@ function validateTimeSlotInput(start, end) {
 }
 
 function hasTimeConflict(activities, day, start, end, excludeId = null) {
-    const startMin = timeToMinutes(start);
-    const endMin = end ? timeToMinutes(end) : (startMin + 30);
-    
-    return activities.find(act => {
-        if (act.day !== day) return false;
-        if (excludeId && act.id === excludeId) return false;
-        
-        const actStart = timeToMinutes(act.timeStart);
-        const actEnd = act.timeEnd ? timeToMinutes(act.timeEnd) : (actStart + 30);
-        
-        return Math.max(startMin, actStart) < Math.min(endMin, actEnd);
-    }) || null;
+    if (start && end) {
+        const startMin = timeToMinutes(start);
+        const endMin = timeToMinutes(end);
+        if (endMin < startMin) {
+            return { title: "Invalid Duration (End time is earlier than start time)" };
+        }
+    }
+    return null;
 }
 
 function convertToHkd(amount, currency) {
@@ -520,6 +518,7 @@ if (typeof document !== 'undefined') {
             currentMonth: new Date().getMonth(),
             destination: "japan",
             activeUser: "Alice",
+            activeGroupId: "",
             firebaseUser: null,
             expenses: [],
             icCards: {
@@ -547,41 +546,55 @@ if (typeof document !== 'undefined') {
         }
 
         function loadAllData() {
-            const storedAct = localStorage.getItem("travelActivities");
-            if (storedAct) {
-                try { state.activities = JSON.parse(storedAct); } catch (e) { state.activities = []; }
-            }
-
             state.destination = localStorage.getItem("travelDestination") || "japan";
             document.getElementById("destination-select").value = state.destination;
 
             state.activeUser = localStorage.getItem("travelActiveUser") || "";
             state.groupCode = localStorage.getItem("travelGroupCode") || "";
             state.mappedRole = localStorage.getItem("travelMappedRole") || "";
+            state.activeGroupId = localStorage.getItem("travelActiveGroupId") || "TRIP-2026";
 
             const firstTime = !state.activeUser || !state.groupCode || !state.mappedRole;
             if (firstTime) {
                 state.activeUser = "Guest";
                 state.groupCode = "TRIP-2026";
                 state.mappedRole = "Alice";
+                state.activeGroupId = "TRIP-2026";
             }
-            
+
             document.getElementById("ic-passenger").value = state.mappedRole;
 
-            const storedExpenses = localStorage.getItem("travelExpenses");
+            // Load partitioned activities
+            const actKey = state.activeGroupId === "TRIP-2026" ? "travelActivities" : `travelActivities_${state.activeGroupId}`;
+            const storedAct = localStorage.getItem(actKey);
+            if (storedAct) {
+                try { state.activities = JSON.parse(storedAct); } catch (e) { state.activities = []; }
+            } else {
+                state.activities = [];
+            }
+
+            // Load partitioned expenses
+            const expKey = state.activeGroupId === "TRIP-2026" ? "travelExpenses" : `travelExpenses_${state.activeGroupId}`;
+            const storedExpenses = localStorage.getItem(expKey);
             if (storedExpenses) {
                 try { state.expenses = JSON.parse(storedExpenses); } catch (e) { state.expenses = []; }
             } else {
-                state.expenses = [
-                    { id: "exp-1", title: "Nagoya Castle Tickets", amount: 1500, currency: "JPY", payer: "Alice", category: "Sights", type: "global", date: new Date().toLocaleDateString() },
-                    { id: "exp-2", title: "Personal Souvenir Kit", amount: 4500, currency: "JPY", payer: "Bob", category: "Shopping", type: "local", date: new Date().toLocaleDateString() },
-                    { id: "exp-3", title: "Jalan Alor Street Dinner", amount: 65, currency: "MYR", payer: "Bob", category: "Food", type: "global", date: new Date().toLocaleDateString() },
-                    { id: "exp-4", title: "Didi Ride Shenzhen Futian", amount: 48, currency: "CNY", payer: "Charlie", category: "Transport", type: "global", date: new Date().toLocaleDateString() }
-                ];
-                saveExpensesToStorage();
+                if (state.activeGroupId === "TRIP-2026") {
+                    state.expenses = [
+                        { id: "exp-1", title: "Nagoya Castle Tickets", amount: 1500, currency: "JPY", payer: "Alice", category: "Sights", type: "global", date: new Date().toLocaleDateString() },
+                        { id: "exp-2", title: "Personal Souvenir Kit", amount: 4500, currency: "JPY", payer: "Bob", category: "Shopping", type: "local", date: new Date().toLocaleDateString() },
+                        { id: "exp-3", title: "Jalan Alor Street Dinner", amount: 65, currency: "MYR", payer: "Bob", category: "Food", type: "global", date: new Date().toLocaleDateString() },
+                        { id: "exp-4", title: "Didi Ride Shenzhen Futian", amount: 48, currency: "CNY", payer: "Charlie", category: "Transport", type: "global", date: new Date().toLocaleDateString() }
+                    ];
+                    saveExpensesToStorage();
+                } else {
+                    state.expenses = [];
+                }
             }
 
-            const storedIC = localStorage.getItem("travelICCards");
+            // Load partitioned IC cards
+            const icKey = state.activeGroupId === "TRIP-2026" ? "travelICCards" : `travelICCards_${state.activeGroupId}`;
+            const storedIC = localStorage.getItem(icKey);
             if (storedIC) {
                 try { state.icCards = JSON.parse(storedIC); } catch (e) { resetICCards(); }
             } else {
@@ -590,16 +603,47 @@ if (typeof document !== 'undefined') {
             }
         }
 
-        function saveActivitiesToStorage() { localStorage.setItem("travelActivities", JSON.stringify(state.activities)); }
-        function saveExpensesToStorage() { localStorage.setItem("travelExpenses", JSON.stringify(state.expenses)); }
-        function saveICCardsToStorage() { localStorage.setItem("travelICCards", JSON.stringify(state.icCards)); }
+        async function saveActivitiesToStorage() {
+            const actKey = state.activeGroupId === "TRIP-2026" ? "travelActivities" : `travelActivities_${state.activeGroupId}`;
+            localStorage.setItem(actKey, JSON.stringify(state.activities));
+            if (state.activeGroupId && state.activeGroupId !== "TRIP-2026" && db) {
+                try {
+                    const docRef = doc(db, "trip_networks", state.activeGroupId);
+                    await updateDoc(docRef, { activities: state.activities });
+                } catch (err) {
+                    console.error("Failed to sync activities to Firestore:", err);
+                }
+            }
+        }
+        async function saveExpensesToStorage() {
+            const expKey = state.activeGroupId === "TRIP-2026" ? "travelExpenses" : `travelExpenses_${state.activeGroupId}`;
+            localStorage.setItem(expKey, JSON.stringify(state.expenses));
+            if (state.activeGroupId && state.activeGroupId !== "TRIP-2026" && db) {
+                try {
+                    const docRef = doc(db, "trip_networks", state.activeGroupId);
+                    await updateDoc(docRef, { expenses: state.expenses });
+                } catch (err) {
+                    console.error("Failed to sync expenses to Firestore:", err);
+                }
+            }
+        }
+        async function saveICCardsToStorage() {
+            const icKey = state.activeGroupId === "TRIP-2026" ? "travelICCards" : `travelICCards_${state.activeGroupId}`;
+            localStorage.setItem(icKey, JSON.stringify(state.icCards));
+            if (state.activeGroupId && state.activeGroupId !== "TRIP-2026" && db) {
+                try {
+                    const docRef = doc(db, "trip_networks", state.activeGroupId);
+                    await updateDoc(docRef, { icCards: state.icCards });
+                } catch (err) {
+                    console.error("Failed to sync IC cards to Firestore:", err);
+                }
+            }
+        }
 
         const calendarElement = document.getElementById("calendar");
         const selectedDayLabel = document.getElementById("selected-day-label");
         const placeInfo = document.getElementById("place-info");
         const addActivityBtn = document.getElementById("add-activity-btn");
-        const saveScheduleBtn = document.getElementById("save-schedule");
-        const loadScheduleBtn = document.getElementById("load-schedule");
         const currentMonthYearLabel = document.getElementById("current-month-year");
         
         // Theme Toggle
@@ -633,11 +677,19 @@ if (typeof document !== 'undefined') {
         const profileBadgeBtn = document.getElementById("profile-badge-btn");
         const currentUserDisplay = document.getElementById("current-user-display");
         const authModal = document.getElementById("auth-modal");
-        const authForm = document.getElementById("auth-form");
-        const authUsernameInput = document.getElementById("auth-username");
-        const authGroupInput = document.getElementById("auth-group");
-        const authRoleSelect = document.getElementById("auth-role");
-        const authCancelBtn = document.getElementById("auth-cancel-btn");
+        const authForm = document.getElementById("join-group-form");
+        const authUsernameInput = document.getElementById("join-username");
+        const authGroupInput = document.getElementById("join-groupcode");
+        const authRoleSelect = { value: "Alice" };
+        const authCancelBtn = { style: { display: "none" } };
+        const closeAuthModalBtn = document.getElementById("close-auth-modal");
+
+        const tabJoinBtn = document.getElementById("tab-join-btn");
+        const tabCreateBtn = document.getElementById("tab-create-btn");
+        const tabBrowseBtn = document.getElementById("tab-browse-btn");
+        const joinGroupForm = document.getElementById("join-group-form");
+        const createGroupForm = document.getElementById("create-group-form");
+        const browseGroupSection = document.getElementById("browse-group-section");
         const syncStatusBadge = document.getElementById("sync-status");
         
         // Auth0 elements
@@ -1225,30 +1277,7 @@ if (typeof document !== 'undefined') {
             }
         });
 
-        saveScheduleBtn.addEventListener("click", () => {
-            localStorage.setItem("travelSchedule", JSON.stringify({
-                activities: state.activities,
-                currentMonth: state.currentMonth,
-                currentYear: state.currentYear
-            }));
-            alert("Backup successful!");
-        });
 
-        loadScheduleBtn.addEventListener("click", () => {
-            const backedUp = localStorage.getItem("travelSchedule");
-            if (backedUp) {
-                try {
-                    const data = JSON.parse(backedUp);
-                    state.activities = data.activities || [];
-                    state.currentMonth = data.currentMonth !== undefined ? data.currentMonth : state.currentMonth;
-                    state.currentYear = data.currentYear !== undefined ? data.currentYear : state.currentYear;
-                    saveActivitiesToStorage();
-                    generateCalendar();
-                    if (state.selectedDay !== null) selectDay(state.selectedDay);
-                    alert("Schedule restored!");
-                } catch(e) { alert("Invalid backup data."); }
-            } else alert("No backup found.");
-        });
 
         // Reminders
         function showToast(title, body) {
@@ -1313,56 +1342,443 @@ if (typeof document !== 'undefined') {
         function openAuthModal(required = false) {
             authModalRequired = required;
             
-            if (state.activeUser === "Guest") {
-                authUsernameInput.value = "";
-                authGroupInput.value = "";
-            } else {
-                authUsernameInput.value = state.activeUser || "";
-                authGroupInput.value = state.groupCode || "";
-            }
+            const joinUserEl = document.getElementById("join-username");
+            const createUserEl = document.getElementById("create-username");
+            const browseUserEl = document.getElementById("browse-username");
+            const joinGroupEl = document.getElementById("join-groupcode");
             
-            authRoleSelect.value = state.mappedRole || "Alice";
-            
-            if (required) {
-                authCancelBtn.style.display = "none";
-            } else {
-                authCancelBtn.style.display = "inline-block";
-            }
-            authModal.style.display = "flex";
+            const userVal = state.activeUser === "Guest" ? "" : (state.activeUser || "");
+            const groupVal = state.groupCode === "TRIP-2026" ? "" : (state.groupCode || "");
+
+            if (joinUserEl) joinUserEl.value = userVal;
+            if (createUserEl) createUserEl.value = userVal;
+            if (browseUserEl) browseUserEl.value = userVal;
+            if (joinGroupEl) joinGroupEl.value = groupVal;
+
+            switchAuthTab("join");
+            authModal.classList.add("open");
         }
 
         function closeAuthModal() {
-            authModal.style.display = "none";
+            authModal.classList.remove("open");
         }
 
-        authForm.addEventListener("submit", (e) => {
-            e.preventDefault();
-            const username = authUsernameInput.value.trim();
-            const group = authGroupInput.value.trim();
-            const role = authRoleSelect.value;
+        // Tab Switching Logic
+        function switchAuthTab(activeTab) {
+            if (!tabJoinBtn || !tabCreateBtn || !tabBrowseBtn) return;
+            
+            tabJoinBtn.classList.remove("active");
+            tabCreateBtn.classList.remove("active");
+            tabBrowseBtn.classList.remove("active");
+            
+            tabJoinBtn.style.borderBottomColor = "transparent";
+            tabCreateBtn.style.borderBottomColor = "transparent";
+            tabBrowseBtn.style.borderBottomColor = "transparent";
 
-            if (username && group && role) {
+            tabJoinBtn.style.color = "var(--text-secondary)";
+            tabCreateBtn.style.color = "var(--text-secondary)";
+            tabBrowseBtn.style.color = "var(--text-secondary)";
+
+            joinGroupForm.style.display = "none";
+            createGroupForm.style.display = "none";
+            browseGroupSection.style.display = "none";
+
+            if (activeTab === "join") {
+                tabJoinBtn.classList.add("active");
+                tabJoinBtn.style.borderBottomColor = "var(--accent)";
+                tabJoinBtn.style.color = "var(--accent)";
+                joinGroupForm.style.display = "block";
+            } else if (activeTab === "create") {
+                tabCreateBtn.classList.add("active");
+                tabCreateBtn.style.borderBottomColor = "var(--accent)";
+                tabCreateBtn.style.color = "var(--accent)";
+                createGroupForm.style.display = "block";
+            } else if (activeTab === "browse") {
+                tabBrowseBtn.classList.add("active");
+                tabBrowseBtn.style.borderBottomColor = "var(--accent)";
+                tabBrowseBtn.style.color = "var(--accent)";
+                browseGroupSection.style.display = "flex";
+                loadBrowseNetworksList();
+            }
+        }
+
+        if (tabJoinBtn) tabJoinBtn.addEventListener("click", () => switchAuthTab("join"));
+        if (tabCreateBtn) tabCreateBtn.addEventListener("click", () => switchAuthTab("create"));
+        if (tabBrowseBtn) tabBrowseBtn.addEventListener("click", () => switchAuthTab("browse"));
+        if (closeAuthModalBtn) {
+            closeAuthModalBtn.addEventListener("click", () => {
+                closeAuthModal();
+            });
+        }
+
+        // Join Existing Group Submit
+        joinGroupForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const username = document.getElementById("join-username").value.trim();
+            const groupCode = document.getElementById("join-groupcode").value.trim();
+            const password = document.getElementById("join-password").value;
+
+            if (!username || !groupCode) {
+                showToast("Auth Error", "Please fill in all fields.");
+                return;
+            }
+
+            if (!state.firebaseUser || !db) {
+                showToast("Auth Error", "Please login with Google first.");
+                return;
+            }
+
+            showToast("Sync Status", "Entering network...");
+
+            try {
+                const docRef = doc(db, "trip_networks", groupCode);
+                const docSnap = await getDoc(docRef);
+
+                if (!docSnap.exists()) {
+                    showToast("Auth Error", `Group "${groupCode}" does not exist. Create it instead!`);
+                    return;
+                }
+
+                const data = docSnap.data();
+                const isPrivate = data.password && data.password.trim().length > 0;
+                
+                if (isPrivate && data.password !== password) {
+                    showToast("Auth Error", "Incorrect group password.");
+                    return;
+                }
+
+                // Add member to group if not already present
+                if (!data.members.includes(state.firebaseUser.uid)) {
+                    await updateDoc(docRef, {
+                        members: arrayUnion(state.firebaseUser.uid)
+                    });
+                }
+
                 state.activeUser = username;
-                state.groupCode = group;
-                state.mappedRole = role;
+                state.groupCode = groupCode;
+                state.mappedRole = "Alice";
+                state.activeGroupId = groupCode;
 
                 localStorage.setItem("travelActiveUser", username);
-                localStorage.setItem("travelGroupCode", group);
-                localStorage.setItem("travelMappedRole", role);
+                localStorage.setItem("travelGroupCode", groupCode);
+                localStorage.setItem("travelMappedRole", state.mappedRole);
+                localStorage.setItem("travelActiveGroupId", groupCode);
 
                 updateProfileUI();
+                await loadUserNetworks(groupCode);
                 closeAuthModal();
-                
-                renderLedger();
-                renderDebtSettlement();
-                updateIcEstimator();
-                glowSyncBadge();
+                showToast("Success", `Joined Group ${groupCode}!`);
+            } catch (err) {
+                console.error("Join Group Error:", err);
+                showToast("Error", `Failed to join: ${err.message}`);
             }
         });
 
-        authCancelBtn.addEventListener("click", () => {
-            if (!authModalRequired) closeAuthModal();
+        // Create New Group Submit
+        createGroupForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const username = document.getElementById("create-username").value.trim();
+            const groupCode = document.getElementById("create-groupcode").value.trim();
+            const setPassword = document.getElementById("create-password").value;
+            const isPublic = document.getElementById("create-public").checked;
+
+            if (!username || !groupCode || (!isPublic && !setPassword)) {
+                showToast("Auth Error", "Please fill in all fields.");
+                return;
+            }
+
+            if (!state.firebaseUser || !db) {
+                showToast("Auth Error", "Please login with Google first.");
+                return;
+            }
+
+            showToast("Sync Status", "Creating network...");
+
+            try {
+                const docRef = doc(db, "trip_networks", groupCode);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    showToast("Auth Error", `Group "${groupCode}" already exists. Try joining it.`);
+                    return;
+                }
+
+                const passwordVal = isPublic ? "" : setPassword;
+                const newNetwork = {
+                    owner: state.firebaseUser.uid,
+                    ownerName: username,
+                    password: passwordVal,
+                    members: [state.firebaseUser.uid],
+                    activities: [],
+                    expenses: [],
+                    icCards: {}
+                };
+
+                await setDoc(docRef, newNetwork);
+
+                // Set local state
+                state.activeUser = username;
+                state.groupCode = groupCode;
+                state.mappedRole = "Alice";
+                state.activeGroupId = groupCode;
+
+                localStorage.setItem("travelActiveUser", username);
+                localStorage.setItem("travelGroupCode", groupCode);
+                localStorage.setItem("travelMappedRole", state.mappedRole);
+                localStorage.setItem("travelActiveGroupId", groupCode);
+
+                // Re-initialize group local storage partitioned keys to be completely empty
+                localStorage.setItem(`travelActivities_${groupCode}`, JSON.stringify([]));
+                localStorage.setItem(`travelExpenses_${groupCode}`, JSON.stringify([]));
+                state.activities = [];
+                state.expenses = [];
+                resetICCards();
+                saveICCardsToStorage();
+
+                updateProfileUI();
+                await loadUserNetworks(groupCode);
+                closeAuthModal();
+                showToast("Success", `Created Group ${groupCode}!`);
+            } catch (err) {
+                console.error("Create Group Error:", err);
+                showToast("Error", `Failed to create: ${err.message}`);
+            }
         });
+
+        // Dynamic Directory Browsing list loading
+        let selectedBrowseGroup = null;
+
+        async function loadBrowseNetworksList() {
+            const listContainer = document.getElementById("network-group-list");
+            if (!listContainer || !db) return;
+
+            listContainer.innerHTML = '<div style="font-size: 0.75rem; color: var(--text-secondary); text-align: center; padding: 1rem;">Loading groups directory...</div>';
+            
+            try {
+                const q = query(collection(db, "trip_networks"));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    listContainer.innerHTML = '<div style="font-size: 0.75rem; color: var(--text-secondary); text-align: center; padding: 1rem;">No networks registered. Be the first to create one!</div>';
+                    return;
+                }
+
+                listContainer.innerHTML = "";
+                
+                querySnapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    const name = docSnap.id;
+                    const isPrivate = data.password && data.password.trim().length > 0;
+                    
+                    const row = document.createElement("div");
+                    row.className = "network-row";
+                    row.style.display = "flex";
+                    row.style.justifyContent = "space-between";
+                    row.style.alignItems = "center";
+                    row.style.padding = "0.55rem 0.65rem";
+                    row.style.border = "1px solid var(--border)";
+                    row.style.borderRadius = "var(--radius-sm)";
+                    row.style.backgroundColor = "var(--bg-card)";
+                    row.style.cursor = "pointer";
+                    row.style.transition = "var(--transition)";
+
+                    const info = document.createElement("div");
+                    info.style.display = "flex";
+                    info.style.flexDirection = "column";
+                    info.style.gap = "0.15rem";
+
+                    const title = document.createElement("span");
+                    title.textContent = name;
+                    title.style.fontWeight = "800";
+                    title.style.fontSize = "0.8rem";
+                    title.style.color = "var(--text-primary)";
+                    info.appendChild(title);
+
+                    const subtitle = document.createElement("span");
+                    const creatorLabel = data.ownerName ? ` | Creator: ${data.ownerName}` : "";
+                    subtitle.textContent = `${data.members ? data.members.length : 1} Members${creatorLabel}`;
+                    subtitle.style.fontSize = "0.65rem";
+                    subtitle.style.color = "var(--text-secondary)";
+                    info.appendChild(subtitle);
+
+                    row.appendChild(info);
+
+                    const rightActions = document.createElement("div");
+                    rightActions.style.display = "flex";
+                    rightActions.style.alignItems = "center";
+                    rightActions.style.gap = "0.4rem";
+
+                    const badge = document.createElement("span");
+                    badge.style.fontSize = "0.65rem";
+                    badge.style.padding = "0.15rem 0.4rem";
+                    badge.style.borderRadius = "3px";
+                    badge.style.fontWeight = "800";
+
+                    if (isPrivate) {
+                        badge.innerHTML = '<i data-lucide="lock" style="width:10px; height:10px; display:inline-block; vertical-align:middle; margin-right:2px;"></i> Private';
+                        badge.style.backgroundColor = "var(--border)";
+                        badge.style.color = "var(--text-secondary)";
+                    } else {
+                        badge.innerHTML = "Public";
+                        badge.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
+                        badge.style.color = "#10b981";
+                    }
+                    rightActions.appendChild(badge);
+
+                    const isOwner = state.firebaseUser && data.owner === state.firebaseUser.uid;
+                    if (isOwner) {
+                        const deleteBtn = document.createElement("button");
+                        deleteBtn.innerHTML = '<i data-lucide="trash-2" style="width:12px; height:12px; color:var(--danger);"></i>';
+                        deleteBtn.style.background = "none";
+                        deleteBtn.style.border = "none";
+                        deleteBtn.style.cursor = "pointer";
+                        deleteBtn.style.padding = "0.2rem";
+                        deleteBtn.title = "Delete Group Network";
+
+                        deleteBtn.addEventListener("click", async (e) => {
+                            e.stopPropagation();
+                            if (confirm(`Are you sure you want to permanently delete the group "${name}"? This action cannot be undone.`)) {
+                                try {
+                                    showToast("Deleting", "Deleting network...");
+                                    await deleteDoc(doc(db, "trip_networks", name));
+                                    showToast("Success", `Group "${name}" deleted successfully.`);
+                                    
+                                    if (state.activeGroupId === name) {
+                                        localStorage.removeItem("travelActiveGroupId");
+                                        localStorage.removeItem("travelGroupCode");
+                                        state.activeGroupId = "";
+                                        state.groupCode = "";
+                                        await loadUserNetworks();
+                                        openAuthModal(true);
+                                    } else {
+                                        await loadBrowseNetworksList();
+                                    }
+                                } catch (err) {
+                                    console.error("Delete Group Error:", err);
+                                    showToast("Error", `Failed to delete group: ${err.message}`);
+                                }
+                            }
+                        });
+                        rightActions.appendChild(deleteBtn);
+                    }
+
+                    row.appendChild(rightActions);
+
+                    row.addEventListener("click", () => {
+                        Array.from(listContainer.children).forEach(child => {
+                            child.style.borderColor = "var(--border)";
+                        });
+                        row.style.borderColor = "var(--accent)";
+                        
+                        selectedBrowseGroup = name;
+                        const joinForm = document.getElementById("browse-join-form");
+                        const selectedLabel = document.getElementById("selected-browse-group-label");
+                        const pwdContainer = document.getElementById("browse-password-container");
+                        const memberStatus = document.getElementById("browse-member-status");
+                        const submitBtn = document.getElementById("browse-submit-btn");
+                        
+                        selectedLabel.textContent = name;
+                        joinForm.style.display = "block";
+                        
+                        const isMember = state.firebaseUser && data.members && data.members.includes(state.firebaseUser.uid);
+                        if (isMember) {
+                            if (memberStatus) {
+                                memberStatus.textContent = "You have joined this group already.";
+                                memberStatus.style.display = "block";
+                            }
+                            pwdContainer.style.display = "none";
+                            document.getElementById("browse-password").required = false;
+                            if (submitBtn) submitBtn.textContent = "Enter Active Group";
+                        } else {
+                            if (memberStatus) memberStatus.style.display = "none";
+                            if (submitBtn) submitBtn.textContent = "Join Selected Group";
+                            if (isPrivate) {
+                                pwdContainer.style.display = "block";
+                                document.getElementById("browse-password").required = true;
+                            } else {
+                                pwdContainer.style.display = "none";
+                                document.getElementById("browse-password").required = false;
+                            }
+                        }
+                    });
+
+                    listContainer.appendChild(row);
+                });
+                lucide.createIcons();
+            } catch (err) {
+                console.error("Browse Groups List Error:", err);
+                listContainer.innerHTML = '<div style="font-size: 0.75rem; color: var(--danger); text-align: center; padding: 1rem;">Failed to load directory.</div>';
+            }
+        }
+
+        // Browse Group Submit Action
+        const browseSubmitBtn = document.getElementById("browse-submit-btn");
+        if (browseSubmitBtn) {
+            browseSubmitBtn.addEventListener("click", async () => {
+                const username = document.getElementById("browse-username").value.trim();
+                const password = document.getElementById("browse-password").value;
+
+                if (!username) {
+                    showToast("Auth Error", "Please enter your name.");
+                    return;
+                }
+
+                if (!selectedBrowseGroup) {
+                    showToast("Auth Error", "Please select a group first.");
+                    return;
+                }
+
+                if (!state.firebaseUser || !db) {
+                    showToast("Auth Error", "Please login with Google first.");
+                    return;
+                }
+
+                showToast("Sync Status", "Entering network...");
+
+                try {
+                    const docRef = doc(db, "trip_networks", selectedBrowseGroup);
+                    const docSnap = await getDoc(docRef);
+
+                    if (!docSnap.exists()) {
+                        showToast("Auth Error", "Selected group no longer exists.");
+                        return;
+                    }
+
+                    const data = docSnap.data();
+                    const isPrivate = data.password && data.password.trim().length > 0;
+                    const isMember = state.firebaseUser && data.members && data.members.includes(state.firebaseUser.uid);
+
+                    if (isPrivate && !isMember && data.password !== password) {
+                        showToast("Auth Error", "Incorrect group password.");
+                        return;
+                    }
+
+                    if (!isMember) {
+                        await updateDoc(docRef, {
+                            members: arrayUnion(state.firebaseUser.uid)
+                        });
+                    }
+
+                    state.activeUser = username;
+                    state.groupCode = selectedBrowseGroup;
+                    state.mappedRole = "Alice";
+                    state.activeGroupId = selectedBrowseGroup;
+
+                    localStorage.setItem("travelActiveUser", username);
+                    localStorage.setItem("travelGroupCode", selectedBrowseGroup);
+                    localStorage.setItem("travelMappedRole", state.mappedRole);
+                    localStorage.setItem("travelActiveGroupId", selectedBrowseGroup);
+
+                    updateProfileUI();
+                    await loadUserNetworks(selectedBrowseGroup);
+                    closeAuthModal();
+                    showToast("Success", `Joined Group ${selectedBrowseGroup}!`);
+                } catch (err) {
+                    console.error("Browse Join Error:", err);
+                    showToast("Error", `Failed to join: ${err.message}`);
+                }
+            });
+        }
 
         profileBadgeBtn.addEventListener("click", () => {
             openAuthModal(false);
@@ -1371,18 +1787,26 @@ if (typeof document !== 'undefined') {
         function updateProfileUI() {
             currentUserDisplay.innerHTML = `<span style="font-weight: 800; color: var(--accent);">${state.activeUser}</span> <span style="font-size:0.65rem; color:var(--text-secondary); background:var(--border); padding:0.15rem 0.3rem; border-radius:3px; margin-left:0.25rem;">${state.groupCode}</span>`;
             
-            icPassengerSelect.value = state.mappedRole;
-            expensePayerSelect.value = state.mappedRole;
+            const payerSelect = document.getElementById("expense-payer");
+            if (payerSelect) {
+                payerSelect.innerHTML = `<option value="${state.activeUser}">${state.activeUser}</option>`;
+                payerSelect.value = state.activeUser;
+            }
+            const icPassengerSelect = document.getElementById("ic-passenger");
+            if (icPassengerSelect) {
+                icPassengerSelect.innerHTML = `<option value="${state.activeUser}">${state.activeUser}</option>`;
+                icPassengerSelect.value = state.activeUser;
+            }
         }
 
         // -------------------------------------------------------------------------
         // FIREBASE GOOGLE AUTHENTICATION SYSTEM
         // -------------------------------------------------------------------------
         if (auth && provider) {
-            onAuthStateChanged(auth, (user) => {
+            onAuthStateChanged(auth, async (user) => {
                 if (user) {
+                    const firstTimeLogin = !state.firebaseUser;
                     state.firebaseUser = user;
-                    // Sync Firebase profile name/email to RoamReady state
                     state.activeUser = user.displayName || user.email || "FirebaseUser";
                     localStorage.setItem("travelActiveUser", state.activeUser);
 
@@ -1391,10 +1815,52 @@ if (typeof document !== 'undefined') {
                     auth0UserAvatar.src = user.photoURL || "";
                     
                     updateProfileUI();
+                    await loadUserNetworks();
+
+                    // Pre-fill usernames in all onboarding forms
+                    const joinUserEl = document.getElementById("join-username");
+                    if (joinUserEl) joinUserEl.value = state.activeUser;
+                    const createUserEl = document.getElementById("create-username");
+                    if (createUserEl) createUserEl.value = state.activeUser;
+                    const browseUserEl = document.getElementById("browse-username");
+                    if (browseUserEl) browseUserEl.value = state.activeUser;
+
+                    // Display feedback toast on initial login
+                    if (firstTimeLogin) {
+                        showToast("Collaborative Sync", `Logged in successfully as ${state.activeUser}!`);
+                    }
+
+                    // Open onboarding modal immediately if no group code is set
+                    const hasGroup = localStorage.getItem("travelGroupCode");
+                    if (!hasGroup || hasGroup === "TRIP-2026") {
+                        openAuthModal(true);
+                    }
                 } else {
                     state.firebaseUser = null;
                     auth0LoginBtn.style.display = "inline-flex";
                     auth0ProfileDiv.style.display = "none";
+                    
+                    // Explicitly purge local storage on logout
+                    localStorage.removeItem("travelActiveUser");
+                    localStorage.removeItem("travelGroupCode");
+                    localStorage.removeItem("travelMappedRole");
+                    localStorage.removeItem("travelActiveGroupId");
+                    
+                    state.activeUser = "Guest";
+                    state.groupCode = "TRIP-2026";
+                    state.mappedRole = "Alice";
+                    state.activeGroupId = "TRIP-2026";
+                    
+                    // Aggressively re-render UI components instantly
+                    updateProfileUI();
+                    loadUserNetworks();
+                    generateCalendar();
+                    if (state.selectedDay !== null) {
+                        renderActivitiesList();
+                    }
+                    renderLedger();
+                    renderDebtSettlement();
+                    updateIcEstimator();
                 }
             });
 
@@ -2128,7 +2594,13 @@ if (typeof document !== 'undefined') {
         }
 
         function updateIcEstimator() {
-            const passenger = icPassengerSelect.value;
+            let passenger = (icPassengerSelect && icPassengerSelect.value) ? icPassengerSelect.value.trim() : "";
+            if (!passenger) {
+                passenger = state.activeUser || "Guest";
+            }
+            if (!state.icCards[passenger]) {
+                state.icCards[passenger] = { JPY: 2000, MYR: 50, CNY: 100, logs: [] };
+            }
             const cards = state.icCards[passenger];
             icCardHolder.textContent = passenger.toUpperCase();
             
@@ -2224,6 +2696,283 @@ if (typeof document !== 'undefined') {
 
             showToast(`Collaborative Sync Alert`, `${payer} added "${title}" (${currency} ${amount}) split globally!`);
         });
+
+        // -------------------------------------------------------------------------
+        // FIRESTORE MULTI-TENANT TRIP NETWORKS & GROUP MANAGEMENT (RADMIN VPN STYLE)
+        // -------------------------------------------------------------------------
+        let networkUnsubscribe = null;
+
+        async function loadUserNetworks(selectedId) {
+            const selectEl = document.getElementById("active-group-select");
+            if (!selectEl) return;
+
+            selectEl.innerHTML = "";
+
+            if (!state.firebaseUser || !db) {
+                selectEl.disabled = true;
+                const opt = document.createElement("option");
+                opt.value = "";
+                opt.textContent = "No Active Trip";
+                selectEl.appendChild(opt);
+                state.activeGroupId = "";
+                return;
+            }
+
+            try {
+                const q = query(collection(db, "trip_networks"), where("members", "array-contains", state.firebaseUser.uid));
+                const querySnapshot = await getDocs(q);
+
+                let hasSelectedId = false;
+                querySnapshot.forEach((docSnap) => {
+                    const opt = document.createElement("option");
+                    opt.value = docSnap.id;
+                    opt.textContent = docSnap.id;
+                    selectEl.appendChild(opt);
+                    if (docSnap.id === selectedId) {
+                        hasSelectedId = true;
+                    }
+                });
+
+                if (selectedId && !hasSelectedId) {
+                    const opt = document.createElement("option");
+                    opt.value = selectedId;
+                    opt.textContent = selectedId;
+                    selectEl.appendChild(opt);
+                }
+
+                if (selectEl.options.length === 0) {
+                    selectEl.disabled = true;
+                    const opt = document.createElement("option");
+                    opt.value = "";
+                    opt.textContent = "No Active Trip";
+                    selectEl.appendChild(opt);
+                    state.activeGroupId = "";
+                } else {
+                    selectEl.disabled = false;
+                    const cachedId = selectedId || localStorage.getItem("travelActiveGroupId") || selectEl.options[0].value;
+                    
+                    let exists = false;
+                    for (let i = 0; i < selectEl.options.length; i++) {
+                        if (selectEl.options[i].value === cachedId) {
+                            exists = true;
+                            break;
+                        }
+                    }
+                    const finalId = exists ? cachedId : selectEl.options[0].value;
+                    
+                    selectEl.value = finalId;
+                    state.activeGroupId = finalId;
+                    localStorage.setItem("travelActiveGroupId", finalId);
+                    switchTripNetwork(finalId);
+                }
+            } catch (err) {
+                console.error("Error loading user networks:", err);
+                selectEl.disabled = true;
+                const opt = document.createElement("option");
+                opt.value = "";
+                opt.textContent = "No Active Trip";
+                selectEl.appendChild(opt);
+                state.activeGroupId = "";
+            }
+        }
+
+        function switchTripNetwork(groupId) {
+            if (networkUnsubscribe) {
+                networkUnsubscribe();
+                networkUnsubscribe = null;
+            }
+
+            if (!groupId || groupId === "TRIP-2026" || !db) {
+                state.activeGroupId = "TRIP-2026";
+                loadAllData();
+                generateCalendar();
+                if (state.selectedDay !== null) {
+                    renderActivitiesList();
+                }
+                renderLedger();
+                renderDebtSettlement();
+                updateIcEstimator();
+                return;
+            }
+
+            try {
+                networkUnsubscribe = onSnapshot(doc(db, "trip_networks", groupId), (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        state.activities = data.activities || [];
+                        state.expenses = data.expenses || [];
+                        if (data.icCards) {
+                            state.icCards = data.icCards;
+                        }
+
+                        generateCalendar();
+                        if (state.selectedDay !== null) {
+                            renderActivitiesList();
+                        }
+                        renderLedger();
+                        renderDebtSettlement();
+                        updateIcEstimator();
+
+                        glowSyncBadge();
+                    } else {
+                        console.warn(`Trip Network ${groupId} not found in Firestore.`);
+                    }
+                }, (err) => {
+                    console.error("Error in network real-time sync listener:", err);
+                });
+            } catch (err) {
+                console.error("Error setting up real-time listener:", err);
+            }
+        }
+
+        // Modal triggers
+        const networkModal = document.getElementById("network-modal");
+        const networkModalBtn = document.getElementById("network-modal-btn");
+        const closeNetworkModalBtn = document.getElementById("close-network-modal");
+        const cancelNetworkBtns = document.querySelectorAll(".cancel-network-btn");
+
+        if (networkModalBtn) {
+            networkModalBtn.addEventListener("click", () => {
+                if (!state.firebaseUser) {
+                    showToast("Auth Error", "Please login with Google first.");
+                    return;
+                }
+                openAuthModal(false);
+                switchAuthTab("browse");
+            });
+        }
+
+        if (closeNetworkModalBtn && networkModal) {
+            closeNetworkModalBtn.addEventListener("click", () => {
+                networkModal.classList.remove("open");
+            });
+        }
+
+        cancelNetworkBtns.forEach((btn) => {
+            btn.addEventListener("click", () => {
+                if (networkModal) networkModal.classList.remove("open");
+            });
+        });
+
+        // Network creation and joining actions
+        const createNetworkBtn = document.getElementById("create-network-btn");
+        const joinNetworkBtn = document.getElementById("join-network-btn");
+        const networkNameInput = document.getElementById("network-name-input");
+        const networkPasswordInput = document.getElementById("network-password-input");
+
+        if (createNetworkBtn) {
+            createNetworkBtn.addEventListener("click", async () => {
+                const name = networkNameInput.value.trim();
+                const password = networkPasswordInput.value;
+
+                if (!name || !password) {
+                    alert("Please fill in all fields.");
+                    return;
+                }
+
+                if (!state.firebaseUser || !db) {
+                    alert("Please login to manage networks.");
+                    return;
+                }
+
+                // Immediate feedback
+                alert("Creating network...");
+
+                try {
+                    const docRef = doc(db, "trip_networks", name);
+                    const docSnap = await getDoc(docRef);
+
+                    if (docSnap.exists()) {
+                        alert("Trip Network already exists. Please choose a unique name or join it.");
+                        return;
+                    }
+
+                    const newNetwork = {
+                        owner: state.firebaseUser.uid,
+                        password: password,
+                        members: [state.firebaseUser.uid],
+                        activities: [],
+                        expenses: [],
+                        icCards: {}
+                    };
+
+                    await setDoc(docRef, newNetwork);
+                    
+                    networkNameInput.value = "";
+                    networkPasswordInput.value = "";
+                    if (networkModal) networkModal.classList.remove("open");
+
+                    alert("Success! Joined network.");
+
+                    await loadUserNetworks(name);
+                } catch (err) {
+                    console.error("Error creating network:", err);
+                    alert("Failed to create network: " + err.message);
+                }
+            });
+        }
+
+        if (joinNetworkBtn) {
+            joinNetworkBtn.addEventListener("click", async () => {
+                const name = networkNameInput.value.trim();
+                const password = networkPasswordInput.value;
+
+                if (!name || !password) {
+                    alert("Please fill in all fields.");
+                    return;
+                }
+
+                if (!state.firebaseUser || !db) {
+                    alert("Please login to manage networks.");
+                    return;
+                }
+
+                // Immediate feedback
+                alert("Joining network...");
+
+                try {
+                    const docRef = doc(db, "trip_networks", name);
+                    const docSnap = await getDoc(docRef);
+
+                    if (!docSnap.exists()) {
+                        alert("Error: Trip Network not found.");
+                        return;
+                    }
+
+                    const data = docSnap.data();
+                    if (data.password !== password) {
+                        alert("Error: Incorrect password.");
+                        return;
+                    }
+
+                    await updateDoc(docRef, {
+                        members: arrayUnion(state.firebaseUser.uid)
+                    });
+
+                    networkNameInput.value = "";
+                    networkPasswordInput.value = "";
+                    if (networkModal) networkModal.classList.remove("open");
+
+                    alert("Success! Joined network.");
+
+                    await loadUserNetworks(name);
+                } catch (err) {
+                    console.error("Error joining network:", err);
+                    alert("Failed to join network: " + err.message);
+                }
+            });
+        }
+
+        // Active network dropdown switcher
+        const activeGroupSelect = document.getElementById("active-group-select");
+        if (activeGroupSelect) {
+            activeGroupSelect.addEventListener("change", (e) => {
+                const selectedVal = e.target.value;
+                state.activeGroupId = selectedVal;
+                localStorage.setItem("travelActiveGroupId", selectedVal);
+                switchTripNetwork(selectedVal);
+            });
+        }
 
         // Bootstrap load
         loadAllData();
