@@ -2243,4 +2243,20 @@ select:focus {
     border-bottom: 3px solid var(--accent) !important;
 }
 
+.scrollbar-custom::-webkit-scrollbar {
+    width: 6px;
+}
+.scrollbar-custom::-webkit-scrollbar-track {
+    background: transparent;
+}
+.scrollbar-custom::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 3px;
+}
+
+.network-row:hover {
+    background-color: rgba(99, 102, 241, 0.04) !important;
+}
+
+
 
