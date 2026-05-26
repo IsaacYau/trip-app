@@ -734,7 +734,6 @@ if (typeof document !== 'undefined') {
         const expenseConvertedText = document.getElementById("expense-converted-text");
         const expensesList = document.getElementById("expenses-list");
         const debtTableBody = document.getElementById("debt-table-body");
-        const simulateSyncBtn = document.getElementById("simulate-sync-btn");
 
         // IC Cards
         const icPassengerSelect = document.getElementById("ic-passenger");
@@ -2781,39 +2780,6 @@ if (typeof document !== 'undefined') {
             }, 1500);
         }
 
-        // Simulate Friend collaborative edit
-        simulateSyncBtn.addEventListener("click", () => {
-            const payers = ["Charlie", "Bob"];
-            const payer = payers[Math.floor(Math.random() * payers.length)];
-            let title = "Nagoya Ramen Bowl", amount = 1800, currency = "JPY", category = "Food";
-
-            if (state.destination === "malaysia") {
-                title = "Penang Hill Funicular Ride"; amount = 30; currency = "MYR"; category = "Sights";
-            } else if (state.destination === "china") {
-                title = "OCT Loft Exhibition"; amount = 45; currency = "CNY"; category = "Sights";
-            }
-
-            const exp = {
-                id: `exp-${Date.now()}`,
-                title,
-                type: "global",
-                amount,
-                currency,
-                payer,
-                category,
-                date: new Date().toLocaleDateString()
-            };
-
-            state.expenses.push(exp);
-            saveExpensesToStorage();
-
-            renderLedger();
-            renderDebtSettlement();
-            updateIcEstimator();
-            glowSyncBadge();
-
-            showToast(`Collaborative Sync Alert`, `${payer} added "${title}" (${currency} ${amount}) split globally!`);
-        });
 
         // -------------------------------------------------------------------------
         // FIRESTORE MULTI-TENANT TRIP NETWORKS & GROUP MANAGEMENT (RADMIN VPN STYLE)
