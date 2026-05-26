@@ -5,8 +5,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/fireba
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 
-// Load configuration synchronously from window.firebaseConfig
-const firebaseConfig = typeof window !== 'undefined' ? window.firebaseConfig : null;
+import { firebaseConfig } from "./config.js";
 
 let app = null;
 let auth = null;
@@ -1743,28 +1742,8 @@ if (typeof document !== 'undefined') {
             });
         }
 
-        profileBadgeBtn.addEventListener("click", async () => {
-            if (state.firebaseUser) {
-                if (confirm("Are you sure you want to sign out?")) {
-                    try {
-                        state.firebaseUser = null;
-                        await signOut(auth);
-                    } catch (err) {
-                        console.error("Firebase Signout Error:", err);
-                    }
-                }
-            } else {
-                if (auth && provider) {
-                    try {
-                        await signInWithPopup(auth, provider);
-                    } catch (err) {
-                        console.error("Firebase Signin Error:", err);
-                        alert("Login Error: " + err.message);
-                    }
-                } else {
-                    alert("Firebase Authentication is not configured.");
-                }
-            }
+        profileBadgeBtn.addEventListener("click", () => {
+            openAuthModal(false);
         });
 
         function updateProfileUI() {
@@ -2803,13 +2782,14 @@ if (typeof document !== 'undefined') {
         const closeNetworkModalBtn = document.getElementById("close-network-modal");
         const cancelNetworkBtns = document.querySelectorAll(".cancel-network-btn");
 
-        if (networkModalBtn && networkModal) {
+        if (networkModalBtn) {
             networkModalBtn.addEventListener("click", () => {
                 if (!state.firebaseUser) {
-                    alert("Please login to manage networks.");
+                    showToast("Auth Error", "Please login with Google first.");
                     return;
                 }
-                networkModal.classList.add("open");
+                openAuthModal(false);
+                switchAuthTab("browse");
             });
         }
 
