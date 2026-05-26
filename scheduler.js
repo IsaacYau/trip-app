@@ -601,6 +601,7 @@ if (typeof document !== 'undefined') {
                 resetICCards();
                 saveICCardsToStorage();
             }
+            initializeFiredReminders();
         }
 
         async function saveActivitiesToStorage() {
@@ -1374,6 +1375,20 @@ if (typeof document !== 'undefined') {
                 offset = 9;
             }
             return new Date(utc + (3600000 * offset));
+        }
+
+        function initializeFiredReminders() {
+            const destNow = getDestinationNow();
+            state.activities.forEach(act => {
+                if (!act.reminder) return;
+                const [sh, sm] = act.timeStart.split(":").map(Number);
+                const actTime = new Date(destNow.getFullYear(), destNow.getMonth(), act.day, sh, sm, 0);
+                const alertTime = new Date(actTime.getTime() - act.reminderOffset * 60 * 1000);
+                
+                if (destNow >= alertTime) {
+                    state.firedReminders.add(act.id);
+                }
+            });
         }
 
         function checkReminders() {
@@ -2917,6 +2932,9 @@ if (typeof document !== 'undefined') {
                             updateDestinationUI();
                             saveICCardsToStorage();
                         }
+
+                        updateProfileUI();
+                        initializeFiredReminders();
 
                         generateCalendar();
                         if (state.selectedDay !== null) {

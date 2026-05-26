@@ -16,3 +16,6 @@
 | task-26 | Show JP/CN/ML in Browse Network row captions next to creator name | completed | |
 | task-27 | Show active country badge JP/CN/ML in updateProfileUI | completed | |
 | task-28 | Verify changes and run unit tests | completed | |
+| task-29 | Implement initializeFiredReminders and call in loadAllData and switchTripNetwork | completed | |
+| task-30 | Invoke updateProfileUI in onSnapshot inside switchTripNetwork | completed | |
+| task-31 | Verify changes and run unit tests | completed | |
