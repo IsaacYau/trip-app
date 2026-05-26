@@ -9,3 +9,13 @@
 | task-19 | Render overlapping event blocks side-by-side (fractional columns) | completed | |
 | task-20 | Add standard browser alert popups for reminders | completed | |
 | task-21 | Verify all changes and run unit tests | completed | |
+| task-22 | Remove group badge next to username in updateProfileUI | completed | |
+| task-23 | Filter place details preview in updateModalPlacePreview by destination country | completed | |
+| task-24 | Implement getDestinationNow and update checkReminders for timezone-accurate popup alert triggers | completed | |
+| task-25 | Run unit tests and verify the updates | completed | |
+| task-26 | Show JP/CN/ML in Browse Network row captions next to creator name | completed | |
+| task-27 | Show active country badge JP/CN/ML in updateProfileUI | completed | |
+| task-28 | Verify changes and run unit tests | completed | |
+| task-29 | Implement initializeFiredReminders and call in loadAllData and switchTripNetwork | completed | |
+| task-30 | Invoke updateProfileUI in onSnapshot inside switchTripNetwork | completed | |
+| task-31 | Verify changes and run unit tests | completed | |

@@ -601,6 +601,7 @@ if (typeof document !== 'undefined') {
                 resetICCards();
                 saveICCardsToStorage();
             }
+            initializeFiredReminders();
         }
 
         async function saveActivitiesToStorage() {
@@ -1224,8 +1225,10 @@ if (typeof document !== 'undefined') {
                 return;
             }
 
+            const targetCountry = state.destination === "japan" ? "Japan" : (state.destination === "china" ? "China" : "Malaysia");
             const cleanLoc = loc.toLowerCase().trim();
             const matchedPlace = placesDatabase.find(p => {
+                if (p.country !== targetCountry) return false;
                 const name = p.name.toLowerCase();
                 const localName = p.localTitle ? p.localTitle.toLowerCase() : "";
                 return cleanLoc.includes(name) || name.includes(cleanLoc) || (localName && (cleanLoc.includes(localName) || localName.includes(cleanLoc)));
@@ -1364,15 +1367,40 @@ if (typeof document !== 'undefined') {
         }
         closeToastBtn.addEventListener("click", () => { reminderToast.classList.remove("show"); });
 
-        function checkReminders() {
+        function getDestinationNow() {
             const now = new Date();
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+            let offset = 8;
+            if (state.destination === "japan") {
+                offset = 9;
+            }
+            return new Date(utc + (3600000 * offset));
+        }
+
+        function initializeFiredReminders() {
+            const destNow = getDestinationNow();
+            state.activities.forEach(act => {
+                if (!act.reminder) return;
+                const [sh, sm] = act.timeStart.split(":").map(Number);
+                const actTime = new Date(destNow.getFullYear(), destNow.getMonth(), act.day, sh, sm, 0);
+                const alertTime = new Date(actTime.getTime() - act.reminderOffset * 60 * 1000);
+                
+                if (destNow >= alertTime) {
+                    state.firedReminders.add(act.id);
+                }
+            });
+        }
+
+        function checkReminders() {
+            const destNow = getDestinationNow();
             state.activities.forEach(act => {
                 if (!act.reminder || state.firedReminders.has(act.id)) return;
-                if (state.currentMonth === now.getMonth() && state.currentYear === now.getFullYear()) {
+                if (state.currentMonth === destNow.getMonth() && state.currentYear === destNow.getFullYear()) {
                     const [sh, sm] = act.timeStart.split(":").map(Number);
-                    const actTime = new Date(now.getFullYear(), now.getMonth(), act.day, sh, sm, 0);
+                    const actTime = new Date(destNow.getFullYear(), destNow.getMonth(), act.day, sh, sm, 0);
                     const alertTime = new Date(actTime.getTime() - act.reminderOffset * 60 * 1000);
-                    if (now >= alertTime && now < actTime) {
+                    
+                    if (destNow >= alertTime && destNow < new Date(actTime.getTime() + 10 * 60 * 1000)) {
                         state.firedReminders.add(act.id);
                         showToast(`Reminder: ${act.title}`, `Starts at ${act.timeStart}!`);
                         alert(`⏰ Reminder: "${act.title}" starts at ${act.timeStart}!`);
@@ -1675,7 +1703,12 @@ if (typeof document !== 'undefined') {
 
                     const subtitle = document.createElement("span");
                     const creatorLabel = data.ownerName ? ` | Creator: ${data.ownerName}` : "";
-                    subtitle.textContent = `${data.members ? data.members.length : 1} Members${creatorLabel}`;
+                    let countryLabel = "";
+                    if (data.destination) {
+                        const d = data.destination.toLowerCase();
+                        countryLabel = ` | ${d === "japan" ? "JP" : (d === "china" ? "CN" : "ML")}`;
+                    }
+                    subtitle.textContent = `${data.members ? data.members.length : 1} Members${creatorLabel}${countryLabel}`;
                     subtitle.style.fontSize = "0.65rem";
                     subtitle.style.color = "var(--text-secondary)";
                     info.appendChild(subtitle);
@@ -1864,7 +1897,13 @@ if (typeof document !== 'undefined') {
         });
 
         function updateProfileUI() {
-            currentUserDisplay.innerHTML = `<span style="font-weight: 800; color: var(--accent);">${state.activeUser}</span> <span style="font-size:0.65rem; color:var(--text-secondary); background:var(--border); padding:0.15rem 0.3rem; border-radius:3px; margin-left:0.25rem;">${state.groupCode}</span>`;
+            let countryBadge = "";
+            if (state.destination) {
+                const d = state.destination.toLowerCase();
+                const code = d === "japan" ? "JP" : (d === "china" ? "CN" : "ML");
+                countryBadge = ` <span style="font-size:0.65rem; color:var(--text-secondary); background:var(--border); padding:0.15rem 0.3rem; border-radius:3px; margin-left:0.25rem; font-weight: 800;">${code}</span>`;
+            }
+            currentUserDisplay.innerHTML = `<span style="font-weight: 800; color: var(--accent);">${state.activeUser}</span>${countryBadge}`;
             
             const payerSelect = document.getElementById("expense-payer");
             if (payerSelect) {
@@ -2893,6 +2932,9 @@ if (typeof document !== 'undefined') {
                             updateDestinationUI();
                             saveICCardsToStorage();
                         }
+
+                        updateProfileUI();
+                        initializeFiredReminders();
 
                         generateCalendar();
                         if (state.selectedDay !== null) {
