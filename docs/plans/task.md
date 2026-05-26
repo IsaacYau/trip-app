@@ -6,4 +6,4 @@
 | task-4 | Fix Persistent Login Refresh Onboarding Bug in scheduler.js | done | |
 | task-5 | Implement Unified 3-Tab Group Creation, Joining, and Directory Browsing in scheduler.js | done | |
 | task-6 | Run verification and tests in test.js | done | |
-| task-7 | Fix header buttons click handlers & Firebase initialization in scheduler.js | in_progress | |
+| task-7 | Fix header buttons click handlers & Firebase initialization in scheduler.js | done | |
