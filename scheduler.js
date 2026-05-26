@@ -3,7 +3,7 @@
 // -------------------------------------------------------------------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 
 import { firebaseConfig } from "./config.js";
 
@@ -648,8 +648,6 @@ if (typeof document !== 'undefined') {
         const selectedDayLabel = document.getElementById("selected-day-label");
         const placeInfo = document.getElementById("place-info");
         const addActivityBtn = document.getElementById("add-activity-btn");
-        const saveScheduleBtn = document.getElementById("save-schedule");
-        const loadScheduleBtn = document.getElementById("load-schedule");
         const currentMonthYearLabel = document.getElementById("current-month-year");
         
         // Theme Toggle
@@ -688,6 +686,7 @@ if (typeof document !== 'undefined') {
         const authGroupInput = document.getElementById("join-groupcode");
         const authRoleSelect = { value: "Alice" };
         const authCancelBtn = { style: { display: "none" } };
+        const closeAuthModalBtn = document.getElementById("close-auth-modal");
 
         const tabJoinBtn = document.getElementById("tab-join-btn");
         const tabCreateBtn = document.getElementById("tab-create-btn");
@@ -1282,30 +1281,7 @@ if (typeof document !== 'undefined') {
             }
         });
 
-        saveScheduleBtn.addEventListener("click", () => {
-            localStorage.setItem("travelSchedule", JSON.stringify({
-                activities: state.activities,
-                currentMonth: state.currentMonth,
-                currentYear: state.currentYear
-            }));
-            alert("Backup successful!");
-        });
 
-        loadScheduleBtn.addEventListener("click", () => {
-            const backedUp = localStorage.getItem("travelSchedule");
-            if (backedUp) {
-                try {
-                    const data = JSON.parse(backedUp);
-                    state.activities = data.activities || [];
-                    state.currentMonth = data.currentMonth !== undefined ? data.currentMonth : state.currentMonth;
-                    state.currentYear = data.currentYear !== undefined ? data.currentYear : state.currentYear;
-                    saveActivitiesToStorage();
-                    generateCalendar();
-                    if (state.selectedDay !== null) selectDay(state.selectedDay);
-                    alert("Schedule restored!");
-                } catch(e) { alert("Invalid backup data."); }
-            } else alert("No backup found.");
-        });
 
         // Reminders
         function showToast(title, body) {
@@ -1433,6 +1409,11 @@ if (typeof document !== 'undefined') {
         if (tabJoinBtn) tabJoinBtn.addEventListener("click", () => switchAuthTab("join"));
         if (tabCreateBtn) tabCreateBtn.addEventListener("click", () => switchAuthTab("create"));
         if (tabBrowseBtn) tabBrowseBtn.addEventListener("click", () => switchAuthTab("browse"));
+        if (closeAuthModalBtn) {
+            closeAuthModalBtn.addEventListener("click", () => {
+                closeAuthModal();
+            });
+        }
 
         // Join Existing Group Submit
         joinGroupForm.addEventListener("submit", async (e) => {
@@ -1529,6 +1510,7 @@ if (typeof document !== 'undefined') {
                 const passwordVal = isPublic ? "" : setPassword;
                 const newNetwork = {
                     owner: state.firebaseUser.uid,
+                    ownerName: username,
                     password: passwordVal,
                     members: [state.firebaseUser.uid],
                     activities: [],
@@ -1617,12 +1599,18 @@ if (typeof document !== 'undefined') {
                     info.appendChild(title);
 
                     const subtitle = document.createElement("span");
-                    subtitle.textContent = `${data.members ? data.members.length : 1} Members`;
+                    const creatorLabel = data.ownerName ? ` | Creator: ${data.ownerName}` : "";
+                    subtitle.textContent = `${data.members ? data.members.length : 1} Members${creatorLabel}`;
                     subtitle.style.fontSize = "0.65rem";
                     subtitle.style.color = "var(--text-secondary)";
                     info.appendChild(subtitle);
 
                     row.appendChild(info);
+
+                    const rightActions = document.createElement("div");
+                    rightActions.style.display = "flex";
+                    rightActions.style.alignItems = "center";
+                    rightActions.style.gap = "0.4rem";
 
                     const badge = document.createElement("span");
                     badge.style.fontSize = "0.65rem";
@@ -1639,8 +1627,46 @@ if (typeof document !== 'undefined') {
                         badge.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
                         badge.style.color = "#10b981";
                     }
+                    rightActions.appendChild(badge);
 
-                    row.appendChild(badge);
+                    const isOwner = state.firebaseUser && data.owner === state.firebaseUser.uid;
+                    if (isOwner) {
+                        const deleteBtn = document.createElement("button");
+                        deleteBtn.innerHTML = '<i data-lucide="trash-2" style="width:12px; height:12px; color:var(--danger);"></i>';
+                        deleteBtn.style.background = "none";
+                        deleteBtn.style.border = "none";
+                        deleteBtn.style.cursor = "pointer";
+                        deleteBtn.style.padding = "0.2rem";
+                        deleteBtn.title = "Delete Group Network";
+
+                        deleteBtn.addEventListener("click", async (e) => {
+                            e.stopPropagation();
+                            if (confirm(`Are you sure you want to permanently delete the group "${name}"? This action cannot be undone.`)) {
+                                try {
+                                    showToast("Deleting", "Deleting network...");
+                                    await deleteDoc(doc(db, "trip_networks", name));
+                                    showToast("Success", `Group "${name}" deleted successfully.`);
+                                    
+                                    if (state.activeGroupId === name) {
+                                        localStorage.removeItem("travelActiveGroupId");
+                                        localStorage.removeItem("travelGroupCode");
+                                        state.activeGroupId = "";
+                                        state.groupCode = "";
+                                        await loadUserNetworks();
+                                        openAuthModal(true);
+                                    } else {
+                                        await loadBrowseNetworksList();
+                                    }
+                                } catch (err) {
+                                    console.error("Delete Group Error:", err);
+                                    showToast("Error", `Failed to delete group: ${err.message}`);
+                                }
+                            }
+                        });
+                        rightActions.appendChild(deleteBtn);
+                    }
+
+                    row.appendChild(rightActions);
 
                     row.addEventListener("click", () => {
                         Array.from(listContainer.children).forEach(child => {
@@ -2670,16 +2696,13 @@ if (typeof document !== 'undefined') {
 
             selectEl.innerHTML = "";
 
-            const defaultOpt = document.createElement("option");
-            defaultOpt.value = "TRIP-2026";
-            defaultOpt.textContent = "TRIP-2026";
-            selectEl.appendChild(defaultOpt);
-
             if (!state.firebaseUser || !db) {
-                state.activeGroupId = "TRIP-2026";
-                selectEl.value = "TRIP-2026";
-                localStorage.setItem("travelActiveGroupId", "TRIP-2026");
-                switchTripNetwork("TRIP-2026");
+                selectEl.disabled = true;
+                const opt = document.createElement("option");
+                opt.value = "";
+                opt.textContent = "No Active Trip";
+                selectEl.appendChild(opt);
+                state.activeGroupId = "";
                 return;
             }
 
@@ -2698,32 +2721,46 @@ if (typeof document !== 'undefined') {
                     }
                 });
 
-                if (selectedId && selectedId !== "TRIP-2026" && !hasSelectedId) {
+                if (selectedId && !hasSelectedId) {
                     const opt = document.createElement("option");
                     opt.value = selectedId;
                     opt.textContent = selectedId;
                     selectEl.appendChild(opt);
                 }
 
-                const cachedId = selectedId || localStorage.getItem("travelActiveGroupId") || "TRIP-2026";
-                let selectedVal = "TRIP-2026";
-
-                for (let i = 0; i < selectEl.options.length; i++) {
-                    if (selectEl.options[i].value === cachedId) {
-                        selectedVal = cachedId;
-                        break;
+                if (selectEl.options.length === 0) {
+                    selectEl.disabled = true;
+                    const opt = document.createElement("option");
+                    opt.value = "";
+                    opt.textContent = "No Active Trip";
+                    selectEl.appendChild(opt);
+                    state.activeGroupId = "";
+                } else {
+                    selectEl.disabled = false;
+                    const cachedId = selectedId || localStorage.getItem("travelActiveGroupId") || selectEl.options[0].value;
+                    
+                    let exists = false;
+                    for (let i = 0; i < selectEl.options.length; i++) {
+                        if (selectEl.options[i].value === cachedId) {
+                            exists = true;
+                            break;
+                        }
                     }
+                    const finalId = exists ? cachedId : selectEl.options[0].value;
+                    
+                    selectEl.value = finalId;
+                    state.activeGroupId = finalId;
+                    localStorage.setItem("travelActiveGroupId", finalId);
+                    switchTripNetwork(finalId);
                 }
-
-                selectEl.value = selectedVal;
-                state.activeGroupId = selectedVal;
-                localStorage.setItem("travelActiveGroupId", selectedVal);
-                switchTripNetwork(selectedVal);
             } catch (err) {
                 console.error("Error loading user networks:", err);
-                selectEl.value = "TRIP-2026";
-                state.activeGroupId = "TRIP-2026";
-                switchTripNetwork("TRIP-2026");
+                selectEl.disabled = true;
+                const opt = document.createElement("option");
+                opt.value = "";
+                opt.textContent = "No Active Trip";
+                selectEl.appendChild(opt);
+                state.activeGroupId = "";
             }
         }
 

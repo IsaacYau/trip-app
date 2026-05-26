@@ -28,8 +28,7 @@
                     <option value="china">🇨🇳 China (Shenzhen)</option>
                     <option value="malaysia">🇲🇾 Malaysia (KL/Penang)</option>
                 </select>
-                <select id="active-group-select" class="header-select" title="Choose Active Trip" style="font-weight: 750;">
-                    <option value="TRIP-2026">TRIP-2026</option>
+                <select id="active-group-select" class="header-select" title="Choose Active Trip" style="font-weight: 750;" disabled>
                 </select>
                 <button id="network-modal-btn" class="header-select profile-badge-btn" title="Create or Join Trip Network" style="display:flex; align-items:center; justify-content:center; width:34px; height:34px; padding:0; flex-shrink:0;">
                     <i data-lucide="network" style="width:16px; height:16px;"></i>
@@ -71,14 +70,6 @@
                 <div>
                     <h2>Interactive Travel Scheduler</h2>
                     <p class="subtitle">Plan your journey step-by-step and manage reminders.</p>
-                </div>
-                <div class="action-row">
-                    <button id="save-schedule" class="btn btn-primary">
-                        <i data-lucide="save"></i> Save Plan
-                    </button>
-                    <button id="load-schedule" class="btn btn-secondary">
-                        <i data-lucide="download"></i> Load Saved
-                    </button>
                 </div>
             </div>
 
@@ -518,6 +509,7 @@
                 <h3 id="auth-modal-title" style="font-family: var(--font-heading); font-weight: 800; font-size: 1.25rem; display: flex; align-items: center; gap: 0.35rem; margin:0;">
                     <i data-lucide="key" style="width:18px; height:18px; color:var(--accent);"></i> Access RoamReady
                 </h3>
+                <button class="close-modal-btn" id="close-auth-modal"><i data-lucide="x"></i></button>
             </div>
             
             <!-- Beautiful Tabs -->
