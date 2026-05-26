@@ -1398,15 +1398,43 @@ if (typeof document !== 'undefined') {
             if (!authModalRequired) closeAuthModal();
         });
 
-        profileBadgeBtn.addEventListener("click", () => {
-            openAuthModal(false);
+        profileBadgeBtn.addEventListener("click", async () => {
+            if (state.firebaseUser) {
+                if (confirm("Are you sure you want to sign out?")) {
+                    try {
+                        state.firebaseUser = null;
+                        await signOut(auth);
+                    } catch (err) {
+                        console.error("Firebase Signout Error:", err);
+                    }
+                }
+            } else {
+                if (auth && provider) {
+                    try {
+                        await signInWithPopup(auth, provider);
+                    } catch (err) {
+                        console.error("Firebase Signin Error:", err);
+                        alert("Login Error: " + err.message);
+                    }
+                } else {
+                    alert("Firebase Authentication is not configured.");
+                }
+            }
         });
 
         function updateProfileUI() {
             currentUserDisplay.innerHTML = `<span style="font-weight: 800; color: var(--accent);">${state.activeUser}</span> <span style="font-size:0.65rem; color:var(--text-secondary); background:var(--border); padding:0.15rem 0.3rem; border-radius:3px; margin-left:0.25rem;">${state.groupCode}</span>`;
             
-            icPassengerSelect.value = state.mappedRole;
-            expensePayerSelect.value = state.mappedRole;
+            const payerSelect = document.getElementById("expense-payer");
+            if (payerSelect) {
+                payerSelect.innerHTML = `<option value="${state.activeUser}">${state.activeUser}</option>`;
+                payerSelect.value = state.activeUser;
+            }
+            const icPassengerSelect = document.getElementById("ic-passenger");
+            if (icPassengerSelect) {
+                icPassengerSelect.innerHTML = `<option value="${state.activeUser}">${state.activeUser}</option>`;
+                icPassengerSelect.value = state.activeUser;
+            }
         }
 
         // -------------------------------------------------------------------------
@@ -1430,7 +1458,28 @@ if (typeof document !== 'undefined') {
                     state.firebaseUser = null;
                     auth0LoginBtn.style.display = "inline-flex";
                     auth0ProfileDiv.style.display = "none";
+                    
+                    // Explicitly purge local storage on logout
+                    localStorage.removeItem("travelActiveUser");
+                    localStorage.removeItem("travelGroupCode");
+                    localStorage.removeItem("travelMappedRole");
+                    localStorage.removeItem("travelActiveGroupId");
+                    
+                    state.activeUser = "Guest";
+                    state.groupCode = "TRIP-2026";
+                    state.mappedRole = "Alice";
+                    state.activeGroupId = "TRIP-2026";
+                    
+                    // Aggressively re-render UI components instantly
+                    updateProfileUI();
                     loadUserNetworks();
+                    generateCalendar();
+                    if (state.selectedDay !== null) {
+                        renderActivitiesList();
+                    }
+                    renderLedger();
+                    renderDebtSettlement();
+                    updateIcEstimator();
                 }
             });
 
@@ -2164,7 +2213,13 @@ if (typeof document !== 'undefined') {
         }
 
         function updateIcEstimator() {
-            const passenger = icPassengerSelect.value;
+            let passenger = (icPassengerSelect && icPassengerSelect.value) ? icPassengerSelect.value.trim() : "";
+            if (!passenger) {
+                passenger = state.activeUser || "Guest";
+            }
+            if (!state.icCards[passenger]) {
+                state.icCards[passenger] = { JPY: 2000, MYR: 50, CNY: 100, logs: [] };
+            }
             const cards = state.icCards[passenger];
             icCardHolder.textContent = passenger.toUpperCase();
             
@@ -2376,7 +2431,7 @@ if (typeof document !== 'undefined') {
         if (networkModalBtn && networkModal) {
             networkModalBtn.addEventListener("click", () => {
                 if (!state.firebaseUser) {
-                    alert("Please sign in using Google Authentication to manage Trip Networks.");
+                    alert("Please login to manage networks.");
                     return;
                 }
                 networkModal.classList.add("open");
@@ -2395,49 +2450,29 @@ if (typeof document !== 'undefined') {
             });
         });
 
-        // Tab Switching
-        const tabCreateNetwork = document.getElementById("tab-create-network");
-        const tabJoinNetwork = document.getElementById("tab-join-network");
-        const createNetworkForm = document.getElementById("create-network-form");
-        const joinNetworkForm = document.getElementById("join-network-form");
+        // Network creation and joining actions
+        const createNetworkBtn = document.getElementById("create-network-btn");
+        const joinNetworkBtn = document.getElementById("join-network-btn");
+        const networkNameInput = document.getElementById("network-name-input");
+        const networkPasswordInput = document.getElementById("network-password-input");
 
-        if (tabCreateNetwork && tabJoinNetwork && createNetworkForm && joinNetworkForm) {
-            tabCreateNetwork.addEventListener("click", () => {
-                tabCreateNetwork.classList.add("active");
-                tabJoinNetwork.classList.remove("active");
-                createNetworkForm.style.display = "block";
-                joinNetworkForm.style.display = "none";
-                
-                tabCreateNetwork.style.color = "var(--accent)";
-                tabCreateNetwork.style.borderBottom = "3px solid var(--accent)";
-                tabJoinNetwork.style.color = "var(--text-secondary)";
-                tabJoinNetwork.style.borderBottom = "3px solid transparent";
-            });
+        if (createNetworkBtn) {
+            createNetworkBtn.addEventListener("click", async () => {
+                const name = networkNameInput.value.trim();
+                const password = networkPasswordInput.value;
 
-            tabJoinNetwork.addEventListener("click", () => {
-                tabJoinNetwork.classList.add("active");
-                tabCreateNetwork.classList.remove("active");
-                joinNetworkForm.style.display = "block";
-                createNetworkForm.style.display = "none";
-
-                tabJoinNetwork.style.color = "var(--accent)";
-                tabJoinNetwork.style.borderBottom = "3px solid var(--accent)";
-                tabCreateNetwork.style.color = "var(--text-secondary)";
-                tabCreateNetwork.style.borderBottom = "3px solid transparent";
-            });
-        }
-
-        // Create Network submit
-        if (createNetworkForm) {
-            createNetworkForm.addEventListener("submit", async (e) => {
-                e.preventDefault();
-                const name = document.getElementById("create-network-name").value.trim();
-                const password = document.getElementById("create-network-password").value;
-
-                if (!state.firebaseUser || !db) {
-                    alert("Please sign in using Google Authentication to create a Trip Network.");
+                if (!name || !password) {
+                    alert("Please fill in all fields.");
                     return;
                 }
+
+                if (!state.firebaseUser || !db) {
+                    alert("Please login to manage networks.");
+                    return;
+                }
+
+                // Immediate feedback
+                alert("Creating network...");
 
                 try {
                     const docRef = doc(db, "trip_networks", name);
@@ -2454,19 +2489,16 @@ if (typeof document !== 'undefined') {
                         members: [state.firebaseUser.uid],
                         activities: [],
                         expenses: [],
-                        icCards: {
-                            Alice: { JPY: 2000, MYR: 50, CNY: 100, logs: [] },
-                            Bob: { JPY: 2000, MYR: 50, CNY: 100, logs: [] },
-                            Charlie: { JPY: 2000, MYR: 50, CNY: 100, logs: [] }
-                        }
+                        icCards: {}
                     };
 
                     await setDoc(docRef, newNetwork);
                     
-                    createNetworkForm.reset();
+                    networkNameInput.value = "";
+                    networkPasswordInput.value = "";
                     if (networkModal) networkModal.classList.remove("open");
 
-                    alert(`Successfully created Trip Network: ${name}`);
+                    alert("Success! Joined network.");
 
                     await loadUserNetworks(name);
                 } catch (err) {
@@ -2476,30 +2508,36 @@ if (typeof document !== 'undefined') {
             });
         }
 
-        // Join Network submit
-        if (joinNetworkForm) {
-            joinNetworkForm.addEventListener("submit", async (e) => {
-                e.preventDefault();
-                const name = document.getElementById("join-network-name").value.trim();
-                const password = document.getElementById("join-network-password").value;
+        if (joinNetworkBtn) {
+            joinNetworkBtn.addEventListener("click", async () => {
+                const name = networkNameInput.value.trim();
+                const password = networkPasswordInput.value;
 
-                if (!state.firebaseUser || !db) {
-                    alert("Please sign in using Google Authentication to join a Trip Network.");
+                if (!name || !password) {
+                    alert("Please fill in all fields.");
                     return;
                 }
+
+                if (!state.firebaseUser || !db) {
+                    alert("Please login to manage networks.");
+                    return;
+                }
+
+                // Immediate feedback
+                alert("Joining network...");
 
                 try {
                     const docRef = doc(db, "trip_networks", name);
                     const docSnap = await getDoc(docRef);
 
                     if (!docSnap.exists()) {
-                        alert("Trip Network not found.");
+                        alert("Error: Trip Network not found.");
                         return;
                     }
 
                     const data = docSnap.data();
                     if (data.password !== password) {
-                        alert("Incorrect password.");
+                        alert("Error: Incorrect password.");
                         return;
                     }
 
@@ -2507,10 +2545,11 @@ if (typeof document !== 'undefined') {
                         members: arrayUnion(state.firebaseUser.uid)
                     });
 
-                    joinNetworkForm.reset();
+                    networkNameInput.value = "";
+                    networkPasswordInput.value = "";
                     if (networkModal) networkModal.classList.remove("open");
 
-                    alert(`Successfully joined Trip Network: ${name}`);
+                    alert("Success! Joined network.");
 
                     await loadUserNetworks(name);
                 } catch (err) {
