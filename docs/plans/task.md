@@ -1,7 +1,6 @@
 | id | task | status | notes |
 | --- | --- | --- | --- |
-| task-8 | Add close (exit) button to auth-modal in scheduler.html and scheduler.js | done | |
-| task-9 | Remove Save Plan and Load Saved buttons from scheduler.html and scheduler.js | done | |
-| task-10 | Delete TRIP-2026 placeholder and disable active-group-select when not in a group | done | |
-| task-11 | Implement group ownerName, show creator in Browse tab, and add Delete Group action | done | |
-| task-12 | Verify all changes and run test suite | done | |
+| task-13 | Add max-height and overflow-y scrollable styles to .modal-container in scheduler.css | completed | |
+| task-14 | Bypass hasTimeConflict for overlaps and only flag negative durations in scheduler.js | completed | |
+| task-15 | Prevent password prompts for existing group members in Browse Network tab | completed | |
+| task-16 | Verify all changes and run TDD test suite | completed | |

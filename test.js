@@ -232,11 +232,12 @@ try {
     const testActivities = [
         { id: "act-1", day: 5, timeStart: "10:00", timeEnd: "11:30", title: "Activity 1" }
     ];
-    assert.ok(hasTimeConflict(testActivities, 5, "10:30", "12:00")); // overlapping start
-    assert.ok(hasTimeConflict(testActivities, 5, "09:00", "10:30")); // overlapping end
+    assert.strictEqual(hasTimeConflict(testActivities, 5, "10:30", "12:00"), null); // overlapping start allowed
+    assert.strictEqual(hasTimeConflict(testActivities, 5, "09:00", "10:30"), null); // overlapping end allowed
     assert.strictEqual(hasTimeConflict(testActivities, 5, "12:00", "13:00"), null); // no overlap
     assert.strictEqual(hasTimeConflict(testActivities, 5, "10:30", "12:00", "act-1"), null); // excluded act-1
     assert.strictEqual(hasTimeConflict(testActivities, 6, "10:30", "12:00"), null); // different day
+    assert.ok(hasTimeConflict(testActivities, 5, "12:00", "11:00")); // negative duration is a conflict
 
     console.log("✅ Utility & validation tests passed!");
 
@@ -374,9 +375,9 @@ try {
         { id: "act-no-end", day: 4, timeStart: "14:00", timeEnd: "", title: "Afternoon Coffee" }
     ];
     // Overlapping during the default 30-minute block (14:00 - 14:30)
-    assert.ok(hasTimeConflict(activitiesWithNoEnd, 4, "14:15", "14:45"));
+    assert.strictEqual(hasTimeConflict(activitiesWithNoEnd, 4, "14:15", "14:45"), null);
     // Overlapping at the very beginning
-    assert.ok(hasTimeConflict(activitiesWithNoEnd, 4, "13:50", "14:10"));
+    assert.strictEqual(hasTimeConflict(activitiesWithNoEnd, 4, "13:50", "14:10"), null);
     // No conflict after the 30-minute block (14:30 onwards)
     assert.strictEqual(hasTimeConflict(activitiesWithNoEnd, 4, "14:30", "15:00"), null);
     console.log("✅ Optional end time validation & fallback conflict tests passed!");

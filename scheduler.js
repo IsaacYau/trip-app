@@ -55,18 +55,14 @@ function validateTimeSlotInput(start, end) {
 }
 
 function hasTimeConflict(activities, day, start, end, excludeId = null) {
-    const startMin = timeToMinutes(start);
-    const endMin = end ? timeToMinutes(end) : (startMin + 30);
-    
-    return activities.find(act => {
-        if (act.day !== day) return false;
-        if (excludeId && act.id === excludeId) return false;
-        
-        const actStart = timeToMinutes(act.timeStart);
-        const actEnd = act.timeEnd ? timeToMinutes(act.timeEnd) : (actStart + 30);
-        
-        return Math.max(startMin, actStart) < Math.min(endMin, actEnd);
-    }) || null;
+    if (start && end) {
+        const startMin = timeToMinutes(start);
+        const endMin = timeToMinutes(end);
+        if (endMin < startMin) {
+            return { title: "Invalid Duration (End time is earlier than start time)" };
+        }
+    }
+    return null;
 }
 
 function convertToHkd(amount, currency) {
@@ -1678,16 +1674,31 @@ if (typeof document !== 'undefined') {
                         const joinForm = document.getElementById("browse-join-form");
                         const selectedLabel = document.getElementById("selected-browse-group-label");
                         const pwdContainer = document.getElementById("browse-password-container");
+                        const memberStatus = document.getElementById("browse-member-status");
+                        const submitBtn = document.getElementById("browse-submit-btn");
                         
                         selectedLabel.textContent = name;
                         joinForm.style.display = "block";
                         
-                        if (isPrivate) {
-                            pwdContainer.style.display = "block";
-                            document.getElementById("browse-password").required = true;
-                        } else {
+                        const isMember = state.firebaseUser && data.members && data.members.includes(state.firebaseUser.uid);
+                        if (isMember) {
+                            if (memberStatus) {
+                                memberStatus.textContent = "You have joined this group already.";
+                                memberStatus.style.display = "block";
+                            }
                             pwdContainer.style.display = "none";
                             document.getElementById("browse-password").required = false;
+                            if (submitBtn) submitBtn.textContent = "Enter Active Group";
+                        } else {
+                            if (memberStatus) memberStatus.style.display = "none";
+                            if (submitBtn) submitBtn.textContent = "Join Selected Group";
+                            if (isPrivate) {
+                                pwdContainer.style.display = "block";
+                                document.getElementById("browse-password").required = true;
+                            } else {
+                                pwdContainer.style.display = "none";
+                                document.getElementById("browse-password").required = false;
+                            }
                         }
                     });
 
@@ -1735,13 +1746,14 @@ if (typeof document !== 'undefined') {
 
                     const data = docSnap.data();
                     const isPrivate = data.password && data.password.trim().length > 0;
+                    const isMember = state.firebaseUser && data.members && data.members.includes(state.firebaseUser.uid);
 
-                    if (isPrivate && data.password !== password) {
+                    if (isPrivate && !isMember && data.password !== password) {
                         showToast("Auth Error", "Incorrect group password.");
                         return;
                     }
 
-                    if (!data.members.includes(state.firebaseUser.uid)) {
+                    if (!isMember) {
                         await updateDoc(docRef, {
                             members: arrayUnion(state.firebaseUser.uid)
                         });
