@@ -256,12 +256,28 @@
                         <span class="wallet-currency-badge">Base: HKD ($)</span>
                     </div>
 
+                    <!-- Day Selector Strip -->
+                    <div class="day-selector-strip" id="day-selector-strip">
+                        <!-- Populated by JS -->
+                    </div>
+
                     <!-- Add Expense Form -->
                     <form id="expense-form" class="expense-form">
+
+                        <!-- ROW 1: Category (required, highest priority) + Type -->
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="expense-title">Expense Title *</label>
-                                <input type="text" id="expense-title" placeholder="e.g. Sushi Dinner" required>
+                                <label for="expense-category">Category *</label>
+                                <select id="expense-category" required>
+                                    <option value="Food">🍔 Food</option>
+                                    <option value="Drinks">☕ Drinks</option>
+                                    <option value="Sights">🎟️ Tickets / Sights</option>
+                                    <option value="Transport">🚇 Transport</option>
+                                    <option value="Shopping">🛍️ Shopping</option>
+                                    <option value="Accommodation">🏨 Accommodation</option>
+                                    <option value="Pharmacy">💊 Pharmacy</option>
+                                    <option value="Other">📦 Other</option>
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label for="expense-type">Expense Type</label>
@@ -270,26 +286,104 @@
                                     <option value="local">👤 Local (Personal)</option>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label for="expense-category">Category</label>
-                                <select id="expense-category">
-                                    <option value="Food">🍔 Food</option>
-                                    <option value="Sights">🎟️ Tickets / Sights</option>
-                                    <option value="Transport">🚇 Transport</option>
-                                    <option value="Shopping">🛍️ Shopping</option>
-                                    <option value="Other">📦 Other</option>
-                                </select>
+                        </div>
+
+                        <!-- SPLIT CONFIG PANEL (global only) -->
+                        <div id="split-config-panel" class="split-config-panel">
+                            <div class="split-panel-title">
+                                <i data-lucide="users" style="width:14px;height:14px;"></i>
+                                Split Among:
+                            </div>
+                            <div id="split-members-list" class="split-members-list">
+                                <!-- Populated by JS -->
+                            </div>
+                            <div class="split-total-indicator">
+                                Total: <span id="split-total-pct">100</span>%
+                                <span id="split-total-warn" class="split-warn" style="display:none;">⚠ Must equal 100%</span>
                             </div>
                         </div>
 
+                        <!-- PAYMENT METHOD PANEL (local only) -->
+                        <div id="payment-method-panel" class="payment-method-panel" style="display:none;">
+                            <div class="payment-method-title">
+                                <i data-lucide="credit-card" style="width:14px;height:14px;"></i>
+                                Payment Method:
+                            </div>
+                            <div class="payment-options">
+                                <label class="payment-option-label">
+                                    <input type="radio" name="pay-method" value="cash" checked>
+                                    <span class="pay-opt-text">💵 Cash</span>
+                                </label>
+                                <label class="payment-option-label">
+                                    <input type="radio" name="pay-method" value="epayment">
+                                    <span class="pay-opt-text">📱 ePayment</span>
+                                </label>
+                                <label class="payment-option-label">
+                                    <input type="radio" name="pay-method" value="transit">
+                                    <span class="pay-opt-text">🚇 Transit Card</span>
+                                </label>
+                            </div>
+                            <div id="epayment-subtypes" class="epayment-subtypes" style="display:none;">
+                                <label class="payment-option-label">
+                                    <input type="radio" name="epay-sub" value="alipayhk" checked>
+                                    <span class="pay-opt-text">AlipayHK</span>
+                                </label>
+                                <label class="payment-option-label">
+                                    <input type="radio" name="epay-sub" value="payme">
+                                    <span class="pay-opt-text">PayMe</span>
+                                </label>
+                                <label class="payment-option-label">
+                                    <input type="radio" name="epay-sub" value="credit">
+                                    <span class="pay-opt-text">Credit Card</span>
+                                </label>
+                            </div>
+                            <div id="transit-note" class="info-note" style="display:none;">
+                                🔗 Linked to Transit Card Estimator — top-up check applies.
+                            </div>
+                        </div>
+
+                        <!-- ROW 2: Description (optional) -->
+                        <div class="form-group">
+                            <label for="expense-title">Description <span class="optional-label">(optional)</span></label>
+                            <input type="text" id="expense-title" placeholder="e.g. Sushi Dinner, convenience store run..." autocomplete="off" list="expense-suggestions">
+                            <datalist id="expense-suggestions">
+                                <option value="Breakfast">
+                                <option value="Lunch">
+                                <option value="Dinner">
+                                <option value="Snacks">
+                                <option value="Coffee">
+                                <option value="Bubble Tea">
+                                <option value="Convenience Store">
+                                <option value="Supermarket">
+                                <option value="Izakaya">
+                                <option value="Ramen">
+                                <option value="Sushi">
+                                <option value="BBQ">
+                                <option value="Hot Pot">
+                                <option value="Dim Sum">
+                                <option value="Street Food">
+                                <option value="Taxi">
+                                <option value="Train">
+                                <option value="Bus">
+                                <option value="Hotel">
+                                <option value="Hostel">
+                                <option value="Museum">
+                                <option value="Theme Park">
+                                <option value="Souvenir">
+                                <option value="Pharmacy">
+                                <option value="Laundry">
+                            </datalist>
+                        </div>
+
+                        <!-- ROW 3: Amount + Currency (locked) + Paid By -->
                         <div class="form-row-three">
                             <div class="form-group">
                                 <label for="expense-amount">Amount *</label>
                                 <input type="number" id="expense-amount" step="0.01" min="0.01" placeholder="0.00" required>
                             </div>
                             <div class="form-group">
-                                <label for="expense-currency">Currency</label>
-                                <select id="expense-currency">
+                                <label for="expense-currency">Currency <span class="optional-label">(auto)</span></label>
+                                <select id="expense-currency" disabled>
                                     <option value="HKD">HKD ($)</option>
                                     <option value="JPY">JPY (¥)</option>
                                     <option value="CNY">CNY (¥)</option>
@@ -354,6 +448,16 @@
                         </select>
                     </div>
 
+                    <!-- Initial Balance Input -->
+                    <div class="ic-initial-balance-row">
+                        <label>Initial Balance:</label>
+                        <div class="ic-initial-input-group">
+                            <input type="number" id="ic-initial-balance" min="0" step="100" placeholder="e.g. 2000">
+                            <span id="ic-currency-symbol">¥</span>
+                            <button type="button" id="ic-set-initial-btn" class="btn btn-sm btn-secondary">Set</button>
+                        </div>
+                    </div>
+
                     <!-- Realistic CSS Transit Card -->
                     <div id="transit-card-skin" class="transit-card-skin suica-skin">
                         <div class="card-chip"></div>
@@ -371,6 +475,10 @@
                         <div class="ic-recharge-title">Recharge Simulator (Local Currency)</div>
                         <div class="recharge-buttons" id="ic-recharge-row">
                             <!-- Populated by JS based on current destination -->
+                        </div>
+                        <div class="custom-recharge-row">
+                            <input type="number" id="ic-custom-amount" min="1" placeholder="Custom amount" class="custom-recharge-input">
+                            <button type="button" id="ic-custom-recharge-btn" class="btn btn-sm btn-accent">+ Add</button>
                         </div>
                     </div>
 
@@ -391,6 +499,19 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Cash Balance Tracker Card (full-width, below wallet grid) -->
+            <div class="card cash-tracker-card">
+                <div class="card-header">
+                    <h3 class="card-title"><i data-lucide="banknote"></i> Cash Balance Tracker</h3>
+                    <span class="wallet-currency-badge" id="cash-tracker-currency-badge">JPY</span>
+                </div>
+                <p style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.75rem;">Track each member's cash spending. Set initial cash in local currency — deducted when you mark an expense as "Cash".</p>
+                <div id="cash-tracker-list" class="cash-tracker-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- Bottom Navigation Bar (Mobile Friendly) -->

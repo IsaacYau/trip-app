@@ -204,68 +204,83 @@ function findDijkstraRoute(destination, start, end, criteria) {
     };
 }
 
-// Pure Debt Settlement Splitter (Supports Local/Global separation & Settle Transfers)
-function calculateDebtSettlement(expenses) {
-    const members = ["Alice", "Bob", "Charlie"];
-    let totalHkd = 0;
-    
-    // Track total effective spending/payments per user in HKD
-    const totalPaid = { Alice: 0, Bob: 0, Charlie: 0 };
+// Pure Debt Settlement Splitter — supports dynamic group members and custom splitAmong/splitRatios
+function calculateDebtSettlement(expenses, members) {
+    if (!members || members.length === 0) members = ["Alice", "Bob", "Charlie"];
+
+    // grossPaid[member] = total HKD paid out (not counting settlements)
+    const grossPaid = {};
+    // netBalance[member] = amount they've contributed minus their owed share (+ = creditor, - = debtor)
+    const netBalance = {};
+    members.forEach(m => { grossPaid[m] = 0; netBalance[m] = 0; });
+
+    let totalHkd = 0; // total global non-settlement spending
 
     expenses.forEach(exp => {
-        // Skip personal/local expenses entirely in group split!
-        if (exp.type === "local") return;
-
+        if (exp.type === "local") return; // skip personal expenses
         const val = convertToHkd(exp.amount, exp.currency);
+        if (!val || val <= 0) return;
 
         if (exp.isSettlement) {
-            // Direct transfer between users:
-            // Credited to the payer, debited from the recipient
-            totalPaid[exp.payer] += val;
-            if (exp.recipient) {
-                totalPaid[exp.recipient] -= val;
-            }
-            // Does NOT increase group spent average
+            // Direct transfer: payer gains credit, recipient loses credit in net balance
+            if (netBalance[exp.payer] !== undefined) netBalance[exp.payer] += val;
+            if (exp.recipient && netBalance[exp.recipient] !== undefined) netBalance[exp.recipient] -= val;
+            // Also track gross paid for settlement (optional)
+            if (grossPaid[exp.payer] !== undefined) grossPaid[exp.payer] += val;
+            if (exp.recipient && grossPaid[exp.recipient] !== undefined) grossPaid[exp.recipient] -= val;
+            return;
+        }
+
+        // Determine who splits and at what ratio
+        const splitAmong = exp.splitAmong && exp.splitAmong.length > 0
+            ? exp.splitAmong.filter(m => members.includes(m))
+            : members;
+        const n = splitAmong.length;
+        if (n === 0) return;
+
+        // Track gross paid and global total
+        if (grossPaid[exp.payer] !== undefined) grossPaid[exp.payer] += val;
+        totalHkd += val;
+
+        // Credit the payer's net balance
+        if (netBalance[exp.payer] !== undefined) netBalance[exp.payer] += val;
+
+        // Debit each split member's share from net balance
+        if (exp.splitRatios && Object.keys(exp.splitRatios).length > 0) {
+            splitAmong.forEach(m => {
+                const ratio = (exp.splitRatios[m] || 0) / 100;
+                if (netBalance[m] !== undefined) netBalance[m] -= val * ratio;
+            });
         } else {
-            // Standard shared global expense
-            totalPaid[exp.payer] += val;
-            totalHkd += val;
+            const share = val / n;
+            splitAmong.forEach(m => {
+                if (netBalance[m] !== undefined) netBalance[m] -= share;
+            });
         }
     });
 
-    const share = totalHkd / 3;
-    const netBalances = {};
-    members.forEach(m => {
-        netBalances[m] = totalPaid[m] - share;
-    });
+    // For backward compat: share = equal split of totalHkd among all members
+    const share = members.length > 0 ? totalHkd / members.length : 0;
 
+    // Separate into debtors (negative net) and creditors (positive net)
     const debtors = [];
     const creditors = [];
-
     members.forEach(m => {
-        const bal = netBalances[m];
-        if (bal < -0.01) {
-            debtors.push({ name: m, amount: Math.abs(bal) });
-        } else if (bal > 0.01) {
-            creditors.push({ name: m, amount: bal });
-        }
+        const bal = netBalance[m] || 0;
+        if (bal < -0.01) debtors.push({ name: m, amount: Math.abs(bal) });
+        else if (bal > 0.01) creditors.push({ name: m, amount: bal });
     });
 
     const settlements = [];
-    let d_idx = 0;
-    let c_idx = 0;
+    let d_idx = 0, c_idx = 0;
 
-    // Greedy double-pointer settlement matching
+    // Greedy double-pointer settlement — minimizes number of transactions
     while (d_idx < debtors.length && c_idx < creditors.length) {
         const debtor = debtors[d_idx];
         const creditor = creditors[c_idx];
         const pay = Math.min(debtor.amount, creditor.amount);
-        
-        settlements.push({
-            from: debtor.name,
-            to: creditor.name,
-            amount: pay
-        });
+
+        settlements.push({ from: debtor.name, to: creditor.name, amount: pay });
 
         debtor.amount -= pay;
         creditor.amount -= pay;
@@ -274,13 +289,9 @@ function calculateDebtSettlement(expenses) {
         if (creditor.amount < 0.01) c_idx++;
     }
 
-    return {
-        totalPaid,
-        totalHkd,
-        share,
-        settlements
-    };
+    return { totalPaid: grossPaid, totalHkd, share, settlements };
 }
+
 
 
 function minutesToTime(mins) {
@@ -521,6 +532,9 @@ if (typeof document !== 'undefined') {
             activeGroupId: "",
             firebaseUser: null,
             expenses: [],
+            groupMembers: ["Alice", "Bob", "Charlie"],
+            selectedExpenseDay: null,
+            cashBalances: {},
             icCards: {
                 Alice: { JPY: 2000, MYR: 50, CNY: 100, logs: [] },
                 Bob: { JPY: 2000, MYR: 50, CNY: 100, logs: [] },
@@ -601,6 +615,19 @@ if (typeof document !== 'undefined') {
                 resetICCards();
                 saveICCardsToStorage();
             }
+
+            // Load cash balances
+            const cashKey = state.activeGroupId === "TRIP-2026" ? "travelCashBalances" : `travelCashBalances_${state.activeGroupId}`;
+            const storedCash = localStorage.getItem(cashKey);
+            if (storedCash) {
+                try { state.cashBalances = JSON.parse(storedCash); } catch (e) { state.cashBalances = {}; }
+            } else {
+                state.cashBalances = {};
+            }
+
+            // Set today's trip day based on destination timezone
+            state.selectedExpenseDay = getTodayTripDay();
+
             initializeFiredReminders();
         }
 
@@ -639,6 +666,10 @@ if (typeof document !== 'undefined') {
                     console.error("Failed to sync IC cards to Firestore:", err);
                 }
             }
+        }
+        async function saveCashBalancesToStorage() {
+            const cashKey = state.activeGroupId === "TRIP-2026" ? "travelCashBalances" : `travelCashBalances_${state.activeGroupId}`;
+            localStorage.setItem(cashKey, JSON.stringify(state.cashBalances));
         }
 
         const calendarElement = document.getElementById("calendar");
@@ -746,6 +777,211 @@ if (typeof document !== 'undefined') {
         const icTransitLogs = document.getElementById("ic-transit-logs");
         const icEstimatedFare = document.getElementById("ic-estimated-fare");
         const icTopupNeeded = document.getElementById("ic-topup-needed");
+
+        // -------------------------------------------------------------------------
+        // WALLET V2 HELPER FUNCTIONS
+        // -------------------------------------------------------------------------
+
+        // Get today as a trip day string (timezone-aware)
+        function getTodayTripDay() {
+            const tz = state.destination === "japan" ? "Asia/Tokyo" :
+                       state.destination === "malaysia" ? "Asia/Kuala_Lumpur" : "Asia/Shanghai";
+            const now = new Date();
+            const opts = { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" };
+            return new Intl.DateTimeFormat("en-CA", opts).format(now); // YYYY-MM-DD
+        }
+
+        // Render the day selector strip above the expense form
+        function renderDaySelector() {
+            const strip = document.getElementById("day-selector-strip");
+            if (!strip) return;
+            const today = getTodayTripDay();
+            if (!state.selectedExpenseDay) state.selectedExpenseDay = today;
+
+            // Build a range of 7 days around today (3 past, today, 3 future)
+            const days = [];
+            for (let i = -3; i <= 3; i++) {
+                const d = new Date(today);
+                d.setDate(d.getDate() + i);
+                const iso = d.toISOString().split("T")[0];
+                days.push(iso);
+            }
+
+            strip.innerHTML = days.map(iso => {
+                const isToday = iso === today;
+                const isSelected = iso === state.selectedExpenseDay;
+                const dateObj = new Date(iso + "T12:00:00");
+                const label = isToday ? "Today" : dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                return `<button type="button" class="day-pill${isSelected ? " active" : ""}${isToday ? " today" : ""}" data-day="${iso}">${label}</button>`;
+            }).join("");
+
+            strip.querySelectorAll(".day-pill").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    state.selectedExpenseDay = btn.dataset.day;
+                    renderDaySelector();
+                });
+            });
+        }
+
+        // Render the split panel for global expenses
+        function renderSplitPanel(members) {
+            const list = document.getElementById("split-members-list");
+            const totalEl = document.getElementById("split-total-pct");
+            const warnEl = document.getElementById("split-total-warn");
+            if (!list) return;
+
+            const n = members.length;
+            const defaultPct = n > 0 ? Math.floor(100 / n) : 0;
+            const remainder = n > 0 ? 100 - (defaultPct * n) : 0;
+
+            list.innerHTML = members.map((m, idx) => {
+                const pct = defaultPct + (idx === 0 ? remainder : 0);
+                return `
+                <div class="split-member-row" data-member="${m}">
+                    <label class="split-member-label">
+                        <input type="checkbox" class="split-checkbox" data-member="${m}" checked>
+                        <span>${m}</span>
+                    </label>
+                    <div class="split-slider-group">
+                        <input type="range" class="split-slider" data-member="${m}" min="0" max="100" step="1" value="${pct}">
+                        <span class="split-pct-label" id="pct-${m}">${pct}%</span>
+                    </div>
+                </div>`;
+            }).join("");
+
+            function recalcTotal() {
+                let sum = 0;
+                list.querySelectorAll(".split-slider").forEach(s => {
+                    if (list.querySelector(`.split-checkbox[data-member="${s.dataset.member}"]`).checked) {
+                        sum += parseInt(s.value, 10);
+                    }
+                });
+                totalEl.textContent = sum;
+                warnEl.style.display = sum !== 100 ? "inline" : "none";
+                totalEl.style.color = sum !== 100 ? "var(--error, #ef4444)" : "var(--success, #22c55e)";
+            }
+
+            list.querySelectorAll(".split-slider").forEach(slider => {
+                slider.addEventListener("input", () => {
+                    document.getElementById(`pct-${slider.dataset.member}`).textContent = slider.value + "%";
+                    recalcTotal();
+                });
+            });
+
+            list.querySelectorAll(".split-checkbox").forEach(cb => {
+                cb.addEventListener("change", () => {
+                    const row = list.querySelector(`.split-member-row[data-member="${cb.dataset.member}"]`);
+                    const slider = row.querySelector(".split-slider");
+                    slider.disabled = !cb.checked;
+                    if (!cb.checked) { slider.value = 0; document.getElementById(`pct-${cb.dataset.member}`).textContent = "0%"; }
+                    recalcTotal();
+                });
+            });
+
+            recalcTotal();
+        }
+
+        // Read split panel values
+        function getSplitConfig() {
+            const list = document.getElementById("split-members-list");
+            if (!list) return null;
+            const splitAmong = [];
+            const splitRatios = {};
+            let total = 0;
+            list.querySelectorAll(".split-member-row").forEach(row => {
+                const m = row.dataset.member;
+                const cb = row.querySelector(".split-checkbox");
+                const slider = row.querySelector(".split-slider");
+                if (cb && cb.checked) {
+                    const pct = parseInt(slider.value, 10);
+                    splitAmong.push(m);
+                    splitRatios[m] = pct;
+                    total += pct;
+                }
+            });
+            if (total !== 100) return null; // invalid split
+            return { splitAmong, splitRatios };
+        }
+
+        // Show/hide split vs payment panels based on expense type
+        function updateExpenseTypePanels(type) {
+            const splitPanel = document.getElementById("split-config-panel");
+            const payPanel = document.getElementById("payment-method-panel");
+            if (type === "global") {
+                if (splitPanel) splitPanel.style.display = "block";
+                if (payPanel) payPanel.style.display = "none";
+            } else {
+                if (splitPanel) splitPanel.style.display = "none";
+                if (payPanel) payPanel.style.display = "block";
+            }
+        }
+
+        // Render cash balance tracker
+        function renderCashTracker() {
+            const list = document.getElementById("cash-tracker-list");
+            const badge = document.getElementById("cash-tracker-currency-badge");
+            if (!list) return;
+
+            const currency = state.destination === "japan" ? "JPY" : state.destination === "malaysia" ? "MYR" : "CNY";
+            const symbol = currency === "JPY" ? "¥" : currency === "MYR" ? "RM" : "¥";
+            if (badge) badge.textContent = currency;
+
+            const members = state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice", "Bob", "Charlie"];
+
+            // Calculate cash spent per member from cash-type local expenses
+            const cashSpent = {};
+            members.forEach(m => { cashSpent[m] = 0; });
+            state.expenses.forEach(exp => {
+                if (exp.type === "local" && exp.paymentMethod && exp.paymentMethod.type === "cash" && exp.currency === currency) {
+                    if (cashSpent[exp.payer] !== undefined) cashSpent[exp.payer] += exp.amount;
+                }
+            });
+
+            list.innerHTML = members.map(m => {
+                if (!state.cashBalances[m]) state.cashBalances[m] = { initial: 0, currency };
+                const initial = state.cashBalances[m].initial || 0;
+                const spent = cashSpent[m] || 0;
+                const remaining = initial - spent;
+                const isNeg = remaining < 0;
+                return `
+                <div class="cash-tracker-row">
+                    <div class="cash-tracker-name">${m}</div>
+                    <div class="cash-tracker-inputs">
+                        <label class="cash-label">Initial ${symbol}</label>
+                        <input type="number" class="cash-initial-input" data-member="${m}" min="0" step="100" value="${initial}" placeholder="0">
+                    </div>
+                    <div class="cash-tracker-balances">
+                        <div class="cash-spent">Spent: ${symbol}${spent.toLocaleString()}</div>
+                        <div class="cash-remaining ${isNeg ? 'cash-negative' : 'cash-positive'}">
+                            Remaining: ${symbol}${remaining.toLocaleString()}
+                            ${isNeg ? ' ⚠️' : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }).join("");
+
+            // Wire up initial balance inputs
+            list.querySelectorAll(".cash-initial-input").forEach(input => {
+                input.addEventListener("change", () => {
+                    const m = input.dataset.member;
+                    const currency = state.destination === "japan" ? "JPY" : state.destination === "malaysia" ? "MYR" : "CNY";
+                    if (!state.cashBalances[m]) state.cashBalances[m] = { initial: 0, currency };
+                    state.cashBalances[m].initial = parseFloat(input.value) || 0;
+                    state.cashBalances[m].currency = currency;
+                    saveCashBalancesToStorage();
+                    renderCashTracker();
+                });
+            });
+        }
+
+        // Deduct cash balance for a payer (called on local cash expenses)
+        function deductCashBalance(payer, amount, currency) {
+            if (!state.cashBalances[payer]) state.cashBalances[payer] = { initial: 0, currency };
+            // Cash is tracked by the render function (reads from expenses), no explicit deduction needed
+            // Just re-render
+            renderCashTracker();
+        }
+
 
         // Theme Toggle
         const storedTheme = localStorage.getItem("theme") || "light";
@@ -1904,15 +2140,34 @@ if (typeof document !== 'undefined') {
             }
             currentUserDisplay.innerHTML = `<span style="font-weight: 800; color: var(--accent);">${state.activeUser}</span>${countryBadge}`;
             
+            const members = state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice", "Bob", "Charlie"];
+
             const payerSelect = document.getElementById("expense-payer");
             if (payerSelect) {
-                payerSelect.innerHTML = `<option value="${state.activeUser}">${state.activeUser}</option>`;
-                payerSelect.value = state.activeUser;
+                payerSelect.innerHTML = members.map(m =>
+                    `<option value="${m}"${m === state.activeUser ? " selected" : ""}>${m}</option>`
+                ).join("");
             }
-            const icPassengerSelect = document.getElementById("ic-passenger");
-            if (icPassengerSelect) {
-                icPassengerSelect.innerHTML = `<option value="${state.activeUser}">${state.activeUser}</option>`;
-                icPassengerSelect.value = state.activeUser;
+            const icPassengerSelectEl = document.getElementById("ic-passenger");
+            if (icPassengerSelectEl) {
+                icPassengerSelectEl.innerHTML = members.map(m =>
+                    `<option value="${m}"${m === state.activeUser ? " selected" : ""}>${m}</option>`
+                ).join("");
+            }
+
+            // Lock currency to destination
+            const currencySelect = document.getElementById("expense-currency");
+            if (currencySelect) {
+                const currencyMap = { japan: "JPY", malaysia: "MYR", china: "CNY" };
+                const destCurrency = currencyMap[state.destination] || "HKD";
+                currencySelect.value = destCurrency;
+                currencySelect.disabled = true;
+            }
+
+            // Update IC currency symbol
+            const icSymbolEl = document.getElementById("ic-currency-symbol");
+            if (icSymbolEl) {
+                icSymbolEl.textContent = state.destination === "malaysia" ? "RM" : "¥";
             }
         }
 
@@ -2023,6 +2278,25 @@ if (typeof document !== 'undefined') {
             gpsCurrentPage = 1;
             updateIcEstimator();
             renderRechargeButtons();
+
+            // Lock currency to destination
+            const currencyMap = { japan: "JPY", malaysia: "MYR", china: "CNY" };
+            const destCurrency = currencyMap[state.destination] || "HKD";
+            if (expenseCurrencySelect) {
+                expenseCurrencySelect.value = destCurrency;
+                expenseCurrencySelect.disabled = true;
+            }
+            updateConvertedIndicator();
+
+            // Refresh wallet panels
+            state.selectedExpenseDay = getTodayTripDay();
+            renderDaySelector();
+            renderSplitPanel(state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice","Bob","Charlie"]);
+            renderCashTracker();
+
+            // Update IC currency symbol
+            const icSymbolEl = document.getElementById("ic-currency-symbol");
+            if (icSymbolEl) icSymbolEl.textContent = state.destination === "malaysia" ? "RM" : "¥";
 
             if (state.destination === "china") {
                 transitTitle.textContent = "Didi Ride Fare Estimator";
@@ -2354,6 +2628,22 @@ if (typeof document !== 'undefined') {
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
+        // Expense type change handler — show/hide split panel vs payment method panel
+        expenseTypeSelect.addEventListener("change", () => {
+            updateExpenseTypePanels(expenseTypeSelect.value);
+        });
+
+        // ePayment sub-type show/hide
+        document.querySelectorAll('input[name="pay-method"]').forEach(radio => {
+            radio.addEventListener("change", () => {
+                const val = radio.value;
+                const eSubs = document.getElementById("epayment-subtypes");
+                const tNote = document.getElementById("transit-note");
+                if (eSubs) eSubs.style.display = val === "epayment" ? "flex" : "none";
+                if (tNote) tNote.style.display = val === "transit" ? "block" : "none";
+            });
+        });
+
         // Shared Ledger Form Submit
         expenseForm.addEventListener("submit", (e) => {
             e.preventDefault();
@@ -2363,25 +2653,58 @@ if (typeof document !== 'undefined') {
                 alert("🔒 Authentication Required: You must log in via Google to add expenses to the group wallet.");
                 return;
             }
-            const title = expenseTitleInput.value;
+            const title = expenseTitleInput.value.trim();
             const type = expenseTypeSelect.value;
             const category = expenseCategoryInput.value;
             const amount = Number(expenseAmountInput.value);
             const currency = expenseCurrencySelect.value;
             const payer = expensePayerSelect.value;
 
-            if (!title || amount <= 0) return;
+            if (!category || amount <= 0) return;
 
             const exp = {
                 id: `exp-${Date.now()}`,
-                title,
+                title: title || category, // default to category if no description
                 type,
                 amount,
                 currency,
                 payer,
                 category,
+                day: state.selectedExpenseDay || getTodayTripDay(),
                 date: new Date().toLocaleDateString()
             };
+
+            if (type === "global") {
+                const splitConfig = getSplitConfig();
+                if (splitConfig) {
+                    exp.splitAmong = splitConfig.splitAmong;
+                    exp.splitRatios = splitConfig.splitRatios;
+                }
+            } else {
+                // Local expense: read payment method
+                const payMethodRadio = document.querySelector('input[name="pay-method"]:checked');
+                const payMethod = payMethodRadio ? payMethodRadio.value : "cash";
+                let subType = null;
+                if (payMethod === "epayment") {
+                    const subRadio = document.querySelector('input[name="epay-sub"]:checked');
+                    subType = subRadio ? subRadio.value : "alipayhk";
+                }
+                exp.paymentMethod = { type: payMethod, subType };
+
+                // For cash: warn if balance is insufficient
+                if (payMethod === "cash" && state.cashBalances[payer]) {
+                    const cashCur = state.destination === "japan" ? "JPY" : state.destination === "malaysia" ? "MYR" : "CNY";
+                    if (currency === cashCur) {
+                        const remaining = (state.cashBalances[payer].initial || 0) -
+                            state.expenses.filter(ex => ex.type === "local" && ex.paymentMethod && ex.paymentMethod.type === "cash" && ex.currency === cashCur && ex.payer === payer)
+                            .reduce((sum, ex) => sum + ex.amount, 0);
+                        if (remaining - amount < 0) {
+                            const sym = currency === "MYR" ? "RM" : "¥";
+                            showToast("⚠️ Low Cash", `${payer}'s cash balance will go negative after this expense (${sym}${(remaining - amount).toFixed(0)})`);
+                        }
+                    }
+                }
+            }
 
             state.expenses.push(exp);
             saveExpensesToStorage();
@@ -2392,6 +2715,7 @@ if (typeof document !== 'undefined') {
 
             renderLedger();
             renderDebtSettlement();
+            renderCashTracker();
             updateIcEstimator();
         });
 
@@ -2412,35 +2736,97 @@ if (typeof document !== 'undefined') {
                 if (window.lucide) lucide.createIcons();
                 return;
             }
-            const sorted = [...state.expenses].sort((a, b) => b.id.localeCompare(a.id));
-            sorted.forEach(exp => {
-                const item = document.createElement("div");
-                item.className = "expense-item";
-                const origSymbol = exp.currency === "JPY" ? "¥" : (exp.currency === "MYR" ? "RM" : (exp.currency === "CNY" ? "¥" : "$"));
-                const hkdVal = convertToHkd(exp.amount, exp.currency).toFixed(2);
-                
-                // Expense type badge
-                const typeText = exp.type === "local" ? "👤 Local" : "🌍 Global";
-                const typeStyle = exp.type === "local" ? "background-color:var(--border); color:var(--text-secondary);" : "background-color:var(--accent-light); color:var(--accent-dark);";
 
-                item.innerHTML = `
-                    <div class="expense-info">
-                        <div class="expense-item-title">${exp.title}</div>
-                        <div class="expense-item-meta" style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
-                            <span>${exp.payer} paid for ${exp.category}</span>
-                            <span class="activity-badge" style="${typeStyle} padding:1px 5px; font-size:0.6rem; font-weight:700;">${typeText}</span>
-                            <span>• ${exp.date}</span>
+            // Filter expenses visible to current user:
+            // - global expenses are always shown
+            // - local expenses only shown to the 'paid by' person
+            // - settlement records always shown
+            const visibleExpenses = state.expenses.filter(exp => {
+                if (exp.isSettlement) return true;
+                if (exp.type === "local") return exp.payer === state.activeUser;
+                return true;
+            });
+
+            if (visibleExpenses.length === 0) {
+                expensesList.innerHTML = `<div class="empty-state"><i data-lucide="receipt" class="empty-icon"></i><p>No expenses visible for you today.</p></div>`;
+                if (window.lucide) lucide.createIcons();
+                return;
+            }
+
+            // Group by day
+            const byDay = {};
+            visibleExpenses.forEach(exp => {
+                const dayKey = exp.day || exp.date || "Unknown";
+                if (!byDay[dayKey]) byDay[dayKey] = [];
+                byDay[dayKey].push(exp);
+            });
+
+            // Sort days descending (most recent first)
+            const sortedDays = Object.keys(byDay).sort((a, b) => b.localeCompare(a));
+
+            const destCurrency = state.destination === "japan" ? "JPY" : state.destination === "malaysia" ? "MYR" : "CNY";
+            const destSymbol = destCurrency === "MYR" ? "RM" : "¥";
+
+            sortedDays.forEach(dayKey => {
+                // Day header
+                const dayHeader = document.createElement("div");
+                dayHeader.className = "ledger-day-header";
+                const today = getTodayTripDay();
+                const dayLabel = dayKey === today ? `📅 Today (${dayKey})` : `📅 ${dayKey}`;
+                dayHeader.textContent = dayLabel;
+                expensesList.appendChild(dayHeader);
+
+                // Expenses for this day
+                byDay[dayKey].sort((a, b) => b.id.localeCompare(a.id)).forEach(exp => {
+                    const item = document.createElement("div");
+                    item.className = "expense-item";
+                    const origSymbol = exp.currency === "MYR" ? "RM" : (exp.currency === "HKD" ? "$" : "¥");
+                    const hkdVal = convertToHkd(exp.amount, exp.currency).toFixed(2);
+                    const localVal = exp.currency === destCurrency ? `${destSymbol}${exp.amount}` : `${origSymbol}${exp.amount}`;
+
+                    // Type badge
+                    const typeText = exp.type === "local" ? "👤 Local" : (exp.isSettlement ? "✅ Settled" : "🌍 Global");
+                    const typeStyle = exp.type === "local" ? "background-color:var(--border); color:var(--text-secondary);" :
+                                     exp.isSettlement ? "background-color:#dcfce7; color:#166534;" :
+                                     "background-color:var(--accent-light); color:var(--accent-dark);";
+
+                    // Payment method badge for local
+                    let payBadge = "";
+                    if (exp.type === "local" && exp.paymentMethod) {
+                        const pm = exp.paymentMethod;
+                        const payIcon = pm.type === "cash" ? "💵" : pm.type === "transit" ? "🚇" : "📱";
+                        const payLabel = pm.type === "cash" ? "Cash" : pm.type === "transit" ? "Transit" : (pm.subType || "ePayment");
+                        payBadge = `<span class="activity-badge" style="background:var(--border); color:var(--text-secondary); padding:1px 4px; font-size:0.6rem; font-weight:700;">${payIcon} ${payLabel}</span>`;
+                    }
+
+                    // Split info for global
+                    let splitBadge = "";
+                    if (exp.type === "global" && !exp.isSettlement && exp.splitAmong) {
+                        splitBadge = `<span style="font-size:0.65rem; color:var(--text-secondary);">÷ ${exp.splitAmong.join(", ")}</span>`;
+                    }
+
+                    const displayTitle = exp.title || exp.category;
+
+                    item.innerHTML = `
+                        <div class="expense-info">
+                            <div class="expense-item-title">${displayTitle}</div>
+                            <div class="expense-item-meta" style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+                                <span>${exp.payer} · ${exp.category}</span>
+                                <span class="activity-badge" style="${typeStyle} padding:1px 5px; font-size:0.6rem; font-weight:700;">${typeText}</span>
+                                ${payBadge}
+                                ${splitBadge}
+                            </div>
                         </div>
-                    </div>
-                    <div class="expense-amount-side">
-                        <div class="expense-amount-hkd">HKD $${hkdVal}</div>
-                        <div class="expense-amount-orig">${origSymbol}${exp.amount}</div>
-                    </div>
-                    <button class="action-icon-btn delete-action" style="width:24px; height:24px; margin-left:0.5rem;" onclick="deleteExpenseHandler('${exp.id}')">
-                        <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
-                    </button>
-                `;
-                expensesList.appendChild(item);
+                        <div class="expense-amount-side">
+                            <div class="expense-amount-hkd">${localVal}</div>
+                            <div class="expense-amount-orig" style="color:var(--text-secondary);">HKD $${hkdVal}</div>
+                        </div>
+                        <button class="action-icon-btn delete-action" style="width:24px; height:24px; margin-left:0.5rem;" onclick="deleteExpenseHandler('${exp.id}')">
+                            <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
+                        </button>
+                    `;
+                    expensesList.appendChild(item);
+                });
             });
             if (window.lucide) lucide.createIcons();
         }
@@ -2458,25 +2844,43 @@ if (typeof document !== 'undefined') {
         // Render Settle up details inside custom neobrutalist table
         function renderDebtSettlement() {
             debtTableBody.innerHTML = "";
-            const result = calculateDebtSettlement(state.expenses);
+            const members = state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice", "Bob", "Charlie"];
+            const result = calculateDebtSettlement(state.expenses, members);
 
             if (result.settlements.length === 0) {
                 debtTableBody.innerHTML = `<tr><td colspan="4" style="padding:1rem; text-align:center; color:var(--text-secondary); font-weight:600;">⚖️ All global shared accounts are perfectly settled up!</td></tr>`;
                 return;
             }
 
+            const destCurrency = state.destination === "japan" ? "JPY" : state.destination === "malaysia" ? "MYR" : "CNY";
+            const destSymbol = destCurrency === "MYR" ? "RM" : "¥";
+
             result.settlements.forEach(s => {
                 const tr = document.createElement("tr");
                 tr.style.borderBottom = "1px solid var(--border)";
-                
+
+                // Convert HKD amount to destination currency for primary display
+                const hkdAmt = s.amount;
+                const localAmt = destCurrency === "JPY" ? (hkdAmt / 0.05).toFixed(0) :
+                                 destCurrency === "MYR" ? (hkdAmt / 2.0).toFixed(2) :
+                                 destCurrency === "CNY" ? (hkdAmt / 1.15).toFixed(2) : hkdAmt.toFixed(2);
+
                 tr.innerHTML = `
                     <td style="padding:0.65rem 0.8rem; font-weight:700; color:var(--danger);">👤 ${s.from}</td>
                     <td style="padding:0.65rem 0.8rem; font-weight:700; color:var(--success);">👤 ${s.to}</td>
-                    <td style="padding:0.65rem 0.8rem; font-weight:750; text-align:right;">HKD $${s.amount.toFixed(2)}</td>
+                    <td style="padding:0.65rem 0.8rem; font-weight:750; text-align:right;">
+                        <div style="font-size:0.9rem; font-weight:800;">${destSymbol}${localAmt}</div>
+                        <div style="font-size:0.7rem; color:var(--text-secondary);">HKD $${hkdAmt.toFixed(2)}</div>
+                    </td>
                     <td style="padding:0.65rem 0.8rem; text-align:center;">
-                        <button class="btn btn-accent btn-sm" style="padding:0.25rem 0.6rem; font-size:0.7rem;" onclick="settleDebtHandler('${s.from}', '${s.to}', ${s.amount})">
-                            <i data-lucide="check-circle" style="width:12px; height:12px;"></i> Settle
-                        </button>
+                        <div style="display:flex; flex-direction:column; gap:0.25rem; align-items:center;">
+                            <button class="btn btn-accent btn-sm" style="padding:0.2rem 0.5rem; font-size:0.65rem;" onclick="settleDebtHandler('${s.from}', '${s.to}', ${hkdAmt}, 'cash')">
+                                💵 Cash
+                            </button>
+                            <button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem; font-size:0.65rem;" onclick="settleDebtHandler('${s.from}', '${s.to}', ${hkdAmt}, 'epayment')">
+                                📱 ePayment
+                            </button>
+                        </div>
                     </td>
                 `;
                 debtTableBody.appendChild(tr);
@@ -2485,30 +2889,38 @@ if (typeof document !== 'undefined') {
         }
 
         // Direct Settle click callback
-        window.settleDebtHandler = function(from, to, amountHkd) {
-            if (confirm(`${from} paid ${to} HKD $${amountHkd.toFixed(2)} directly outside the app to settle up?`)) {
+        window.settleDebtHandler = function(from, to, amountHkd, payMethod) {
+            const methodLabel = payMethod === "epayment" ? "ePayment (AlipayHK/PayMe/Credit)" : "Cash";
+            if (confirm(`${from} pays ${to} HKD $${amountHkd.toFixed(2)} via ${methodLabel}?`)) {
                 const exp = {
                     id: `exp-${Date.now()}`,
-                    title: `Settle: ${from} ➔ ${to}`,
+                    title: `Settle: ${from} ➔ ${to} (${methodLabel})`,
                     type: "global",
                     amount: amountHkd,
                     currency: "HKD",
                     payer: from,
                     recipient: to,
                     category: "Other",
-                    isSettlement: true, // Special settlement transaction flag
+                    isSettlement: true,
+                    paymentMethod: { type: payMethod, subType: null },
+                    day: getTodayTripDay(),
                     date: new Date().toLocaleDateString()
                 };
 
                 state.expenses.push(exp);
                 saveExpensesToStorage();
 
+                // Deduct from cash tracker if paid in cash
+                if (payMethod === "cash") {
+                    renderCashTracker();
+                }
+
                 renderLedger();
                 renderDebtSettlement();
                 updateIcEstimator();
                 glowSyncBadge();
 
-                alert(`Recorded direct settlement!`);
+                showToast("✅ Settlement Recorded", `${from} paid ${to} ${methodLabel}`);
             }
         };
 
@@ -2683,18 +3095,22 @@ if (typeof document !== 'undefined') {
                 btn.className = "btn btn-secondary btn-sm";
                 btn.textContent = act.label;
                 btn.addEventListener("click", () => {
+                    const passenger = (icPassengerSelect && icPassengerSelect.value) ? icPassengerSelect.value : state.activeUser;
                     const currency = state.destination === "japan" ? "JPY" : (state.destination === "malaysia" ? "MYR" : "CNY");
-                    state.icCards[state.activeUser][currency] += act.val;
+                    if (!state.icCards[passenger]) state.icCards[passenger] = { JPY: 0, MYR: 0, CNY: 0, logs: [] };
+                    state.icCards[passenger][currency] += act.val;
                     
-                    // Add recharge to ledger as personal/local expense!
+                    // Add recharge to ledger as personal/local expense
                     const exp = {
                         id: `exp-${Date.now()}`,
-                        title: `IC Card Recharge (${state.activeUser})`,
+                        title: `IC Card Recharge (${passenger})`,
                         amount: act.val,
                         currency,
-                        payer: state.activeUser,
+                        payer: passenger,
                         category: "Transport",
-                        type: "local", // It's Bob's/Alice's personal card top-up, so it's a personal/local expense!
+                        type: "local",
+                        paymentMethod: { type: "transit", subType: null },
+                        day: getTodayTripDay(),
                         date: new Date().toLocaleDateString()
                     };
                     state.expenses.push(exp);
@@ -2704,11 +3120,68 @@ if (typeof document !== 'undefined') {
                     updateIcEstimator();
                     renderLedger();
                     renderDebtSettlement();
-                    alert(`Top-up complete and logged in ledger!`);
+                    showToast("✅ IC Top-up", `${passenger}'s card recharged by ${act.label}`);
                 });
                 icRechargeRow.appendChild(btn);
             });
         }
+
+        // IC Card: Initial Balance Set button
+        const icSetInitialBtn = document.getElementById("ic-set-initial-btn");
+        const icInitialBalanceInput = document.getElementById("ic-initial-balance");
+        if (icSetInitialBtn && icInitialBalanceInput) {
+            icSetInitialBtn.addEventListener("click", () => {
+                const passenger = (icPassengerSelect && icPassengerSelect.value) ? icPassengerSelect.value : state.activeUser;
+                const val = parseFloat(icInitialBalanceInput.value);
+                if (isNaN(val) || val < 0) { showToast("⚠️ Invalid", "Please enter a valid initial balance"); return; }
+                const currency = state.destination === "japan" ? "JPY" : (state.destination === "malaysia" ? "MYR" : "CNY");
+                if (!state.icCards[passenger]) state.icCards[passenger] = { JPY: 0, MYR: 0, CNY: 0, logs: [] };
+                state.icCards[passenger][currency] = val;
+                saveICCardsToStorage();
+                updateIcEstimator();
+                showToast("✅ Balance Set", `${passenger}'s IC card balance set to ${val}`);
+                icInitialBalanceInput.value = "";
+            });
+        }
+
+        // IC Card: Custom Recharge button
+        const icCustomAmountInput = document.getElementById("ic-custom-amount");
+        const icCustomRechargeBtn = document.getElementById("ic-custom-recharge-btn");
+        if (icCustomRechargeBtn && icCustomAmountInput) {
+            icCustomRechargeBtn.addEventListener("click", () => {
+                const passenger = (icPassengerSelect && icPassengerSelect.value) ? icPassengerSelect.value : state.activeUser;
+                const val = parseFloat(icCustomAmountInput.value);
+                if (isNaN(val) || val <= 0) { showToast("⚠️ Invalid", "Enter a custom recharge amount"); return; }
+                const currency = state.destination === "japan" ? "JPY" : (state.destination === "malaysia" ? "MYR" : "CNY");
+                if (!state.icCards[passenger]) state.icCards[passenger] = { JPY: 0, MYR: 0, CNY: 0, logs: [] };
+                state.icCards[passenger][currency] += val;
+
+                // Log as local expense
+                const exp = {
+                    id: `exp-${Date.now()}`,
+                    title: `IC Card Recharge (${passenger})`,
+                    amount: val,
+                    currency,
+                    payer: passenger,
+                    category: "Transport",
+                    type: "local",
+                    paymentMethod: { type: "transit", subType: null },
+                    day: getTodayTripDay(),
+                    date: new Date().toLocaleDateString()
+                };
+                state.expenses.push(exp);
+
+                saveICCardsToStorage();
+                saveExpensesToStorage();
+                updateIcEstimator();
+                renderLedger();
+                renderDebtSettlement();
+                const sym = currency === "MYR" ? "RM" : "¥";
+                showToast("✅ IC Top-up", `${passenger}'s card recharged by ${sym}${val}`);
+                icCustomAmountInput.value = "";
+            });
+        }
+
 
         function updateIcEstimator() {
             let passenger = (icPassengerSelect && icPassengerSelect.value) ? icPassengerSelect.value.trim() : "";
@@ -2888,6 +3361,18 @@ if (typeof document !== 'undefined') {
                         if (data.icCards) {
                             state.icCards = data.icCards;
                         }
+                        if (data.cashBalances) {
+                            state.cashBalances = data.cashBalances;
+                        }
+
+                        // Extract group members from member names array (if stored in Firestore)
+                        if (data.memberNames && data.memberNames.length > 0) {
+                            state.groupMembers = data.memberNames;
+                        } else if (data.members && typeof data.members === "object") {
+                            // Legacy: members stored as {username: role}
+                            state.groupMembers = Object.values(data.members);
+                        }
+
                         if (data.destination) {
                             state.destination = data.destination.toLowerCase();
                             localStorage.setItem("travelDestination", state.destination);
@@ -2909,6 +3394,8 @@ if (typeof document !== 'undefined') {
                         renderLedger();
                         renderDebtSettlement();
                         updateIcEstimator();
+                        renderSplitPanel(state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice","Bob","Charlie"]);
+                        renderCashTracker();
 
                         glowSyncBadge();
                     } else {
@@ -3088,6 +3575,12 @@ if (typeof document !== 'undefined') {
         fetchPlacesDb();
         renderLedger();
         renderDebtSettlement();
+
+        // Wallet V2 initial renders
+        renderDaySelector();
+        renderSplitPanel(state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice","Bob","Charlie"]);
+        renderCashTracker();
+        updateExpenseTypePanels("global"); // default to global, show split panel
 
 
 
