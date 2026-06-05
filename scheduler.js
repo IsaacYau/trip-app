@@ -74,25 +74,48 @@ function convertToHkd(amount, currency) {
 const TRANSIT_NETWORKS = {
     japan: {
         nodes: ["Nagoya Station", "Sakae", "Osaka Castle", "Umeda", "Namba", "Universal Studios", "Sannomiya", "Kobe Harborland"],
+        coordinates: {
+            "Nagoya Station": { lat: 35.17091, lon: 136.88153 },
+            "Sakae": { lat: 35.16979, lon: 136.90827 },
+            "Umeda": { lat: 34.70248, lon: 135.49595 },
+            "Namba": { lat: 34.66708, lon: 135.50090 },
+            "Osaka Castle": { lat: 34.68731, lon: 135.52620 },
+            "Universal Studios": { lat: 34.66544, lon: 135.43233 },
+            "Sannomiya": { lat: 34.69466, lon: 135.19488 },
+            "Kobe Harborland": { lat: 34.67915, lon: 135.18431 }
+        },
         links: [
-            { u: "Nagoya Station", v: "Sakae", time: 5, fare: 210, line: "Higashiyama Line", color: "#e53e3e" },
-            { u: "Nagoya Station", v: "Umeda", time: 50, fare: 5900, line: "Tokaido Shinkansen", color: "#3182ce" },
-            { u: "Umeda", v: "Namba", time: 8, fare: 240, line: "Midosuji Line", color: "#e53e3e" },
-            { u: "Umeda", v: "Osaka Castle", time: 10, fare: 170, line: "JR Loop Line", color: "#dd6b20" },
-            { u: "Namba", v: "Universal Studios", time: 15, fare: 210, line: "JR Sakurajima Line", color: "#319795" },
-            { u: "Umeda", v: "Sannomiya", time: 30, fare: 330, line: "Hankyu Kobe Line", color: "#805ad5" },
-            { u: "Sannomiya", v: "Kobe Harborland", time: 8, fare: 210, line: "Kaigan Line", color: "#38a169" }
+            { u: "Nagoya Station", v: "Sakae", type: "subway", time: 5, fare: 210, line: "Higashiyama Line", color: "#e53e3e", schedule: { weekday: 5, weekend: 8 } },
+            { u: "Nagoya Station", v: "Sakae", type: "bus", time: 12, fare: 210, line: "Nagoya City Bus 1", color: "#3182ce", schedule: { weekday: 15, weekend: 20 } },
+            { u: "Nagoya Station", v: "Umeda", type: "subway", time: 50, fare: 5900, line: "Tokaido Shinkansen", color: "#3182ce", schedule: { weekday: 10, weekend: 15 } },
+            { u: "Umeda", v: "Namba", type: "subway", time: 8, fare: 240, line: "Midosuji Line", color: "#e53e3e", schedule: { weekday: 4, weekend: 6 } },
+            { u: "Umeda", v: "Osaka Castle", type: "subway", time: 10, fare: 170, line: "JR Loop Line", color: "#dd6b20", schedule: { weekday: 6, weekend: 10 } },
+            { u: "Umeda", v: "Osaka Castle", type: "bus", time: 20, fare: 210, line: "Osaka City Bus 5", color: "#38a169", schedule: { weekday: 20, weekend: 30 } },
+            { u: "Namba", v: "Universal Studios", type: "subway", time: 15, fare: 210, line: "JR Sakurajima Line", color: "#319795", schedule: { weekday: 8, weekend: 12 } },
+            { u: "Umeda", v: "Sannomiya", type: "subway", time: 30, fare: 330, line: "Hankyu Kobe Line", color: "#805ad5", schedule: { weekday: 7, weekend: 10 } },
+            { u: "Sannomiya", v: "Kobe Harborland", type: "subway", time: 8, fare: 210, line: "Kaigan Line", color: "#38a169", schedule: { weekday: 6, weekend: 10 } }
         ]
     },
     malaysia: {
         nodes: ["KL Sentral", "KLCC", "Bukit Bintang", "Batu Caves", "Butterworth", "George Town", "Penang Hill"],
+        coordinates: {
+            "KL Sentral": { lat: 3.13442, lon: 101.68611 },
+            "KLCC": { lat: 3.15878, lon: 101.71158 },
+            "Bukit Bintang": { lat: 3.14731, lon: 101.71077 },
+            "Batu Caves": { lat: 3.23741, lon: 101.69632 },
+            "Butterworth": { lat: 5.39412, lon: 100.36881 },
+            "George Town": { lat: 5.41401, lon: 100.36294 },
+            "Penang Hill": { lat: 5.40833, lon: 100.27722 }
+        },
         links: [
-            { u: "KL Sentral", v: "KLCC", time: 10, fare: 2.40, line: "Kelana Jaya Line", color: "#e53e3e" },
-            { u: "KL Sentral", v: "Bukit Bintang", time: 7, fare: 1.80, line: "Kajang MRT Line", color: "#3182ce" },
-            { u: "KL Sentral", v: "Batu Caves", time: 25, fare: 2.60, line: "KTM Komuter", color: "#38a169" },
-            { u: "KL Sentral", v: "Butterworth", time: 240, fare: 60.00, line: "ETS Gold Train", color: "#d69e2e" },
-            { u: "Butterworth", v: "George Town", time: 20, fare: 2.00, line: "Penang Ferry", color: "#319795" },
-            { u: "George Town", v: "Penang Hill", time: 30, fare: 30.00, line: "Funicular Railway", color: "#805ad5" }
+            { u: "KL Sentral", v: "KLCC", type: "subway", time: 10, fare: 2.40, line: "Kelana Jaya Line", color: "#e53e3e", schedule: { weekday: 4, weekend: 8 } },
+            { u: "KL Sentral", v: "Bukit Bintang", type: "subway", time: 7, fare: 1.80, line: "Kajang MRT Line", color: "#3182ce", schedule: { weekday: 5, weekend: 8 } },
+            { u: "KL Sentral", v: "Bukit Bintang", type: "bus", time: 15, fare: 1.00, line: "RapidKL Bus 300", color: "#dd6b20", schedule: { weekday: 15, weekend: 20 } },
+            { u: "KL Sentral", v: "Batu Caves", type: "subway", time: 25, fare: 2.60, line: "KTM Komuter", color: "#38a169", schedule: { weekday: 15, weekend: 30 } },
+            { u: "KL Sentral", v: "Butterworth", type: "subway", time: 240, fare: 60.00, line: "ETS Gold Train", color: "#d69e2e", schedule: { weekday: 60, weekend: 60 } },
+            { u: "Butterworth", v: "George Town", type: "subway", time: 20, fare: 2.00, line: "Penang Ferry", color: "#319795", schedule: { weekday: 30, weekend: 30 } },
+            { u: "George Town", v: "Penang Hill", type: "subway", time: 30, fare: 30.00, line: "Funicular Railway", color: "#805ad5", schedule: { weekday: 15, weekend: 15 } },
+            { u: "George Town", v: "Penang Hill", type: "bus", time: 45, fare: 2.00, line: "Rapid Penang Bus 204", color: "#38a169", schedule: { weekday: 25, weekend: 35 } }
         ]
     },
     china: {
@@ -108,18 +131,23 @@ const TRANSIT_NETWORKS = {
 };
 
 // Dijkstra Path Finder
-function findDijkstraRoute(destination, start, end, criteria) {
+function findDijkstraRoute(destination, start, end, criteria, travelDate) {
     const network = TRANSIT_NETWORKS[destination];
     if (!network) return null;
 
     const nodes = network.nodes;
     const links = network.links;
 
+    const dateObj = travelDate ? new Date(travelDate) : new Date();
+    const day = dateObj.getDay();
+    const isWeekend = (day === 0 || day === 6);
+    const schedKey = isWeekend ? "weekend" : "weekday";
+
     const adj = {};
     nodes.forEach(n => adj[n] = []);
     links.forEach(l => {
-        adj[l.u].push({ node: l.v, time: l.time, fare: l.fare, line: l.line, color: l.color });
-        adj[l.v].push({ node: l.u, time: l.time, fare: l.fare, line: l.line, color: l.color });
+        adj[l.u].push({ node: l.v, time: l.time, fare: l.fare, line: l.line, color: l.color, schedule: l.schedule, type: l.type });
+        adj[l.v].push({ node: l.u, time: l.time, fare: l.fare, line: l.line, color: l.color, schedule: l.schedule, type: l.type });
     });
 
     const dist = {};
@@ -149,12 +177,17 @@ function findDijkstraRoute(destination, start, end, criteria) {
             if (!queue.has(edge.node)) return;
 
             let weight = 0;
+            const waitTime = edge.schedule ? (edge.schedule[schedKey] || 10) / 2 : 0;
+
             if (criteria === "time") {
-                weight = edge.time;
+                weight = edge.time + waitTime;
+            } else if (criteria === "fare") {
+                weight = edge.fare;
             } else {
+                // Optimized / balanced
                 const lastLink = prevLink[u];
                 const isTransfer = lastLink && lastLink.line !== edge.line;
-                weight = 1 + (isTransfer ? 1000 : 0); 
+                weight = edge.time + waitTime + (isTransfer ? 15 : 0);
             }
 
             const alt = dist[u] + weight;
