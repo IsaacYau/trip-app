@@ -1333,7 +1333,7 @@ select:focus {
 
 .expense-form .form-row {
     display: grid;
-    grid-template-columns: 1.2fr 0.8fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 0.65rem;
 }
 
@@ -1343,7 +1343,7 @@ select:focus {
     gap: 0.65rem;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
     .expense-form .form-row,
     .form-row-three {
         grid-template-columns: 1fr;
@@ -2498,7 +2498,8 @@ select:focus {
    WALLET V2: Cash Balance Tracker
    ============================================================ */
 .cash-tracker-card {
-    margin-top: 1rem;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
     padding: 1rem;
     border-radius: var(--radius-md);
     background: var(--bg-card);

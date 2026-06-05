@@ -248,6 +248,18 @@
 
             </div>
 
+            <!-- Cash Balance Tracker Card (full-width, top of wallet grid) -->
+            <div class="card cash-tracker-card">
+                <div class="card-header">
+                    <h3 class="card-title"><i data-lucide="banknote"></i> Cash Balance Tracker</h3>
+                    <span class="wallet-currency-badge" id="cash-tracker-currency-badge">JPY</span>
+                </div>
+                <p style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.75rem;">Track each member's cash spending. Set initial cash in local currency — deducted when you mark an expense as "Cash".</p>
+                <div id="cash-tracker-list" class="cash-tracker-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
             <div class="wallet-grid">
                 <!-- Left panel: Shared Ledger (HKD Base) -->
                 <div class="card wallet-ledger-card">
@@ -497,18 +509,6 @@
                             <strong id="ic-topup-needed">¥0 (HK$0.00)</strong>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Cash Balance Tracker Card (full-width, below wallet grid) -->
-            <div class="card cash-tracker-card">
-                <div class="card-header">
-                    <h3 class="card-title"><i data-lucide="banknote"></i> Cash Balance Tracker</h3>
-                    <span class="wallet-currency-badge" id="cash-tracker-currency-badge">JPY</span>
-                </div>
-                <p style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.75rem;">Track each member's cash spending. Set initial cash in local currency — deducted when you mark an expense as "Cash".</p>
-                <div id="cash-tracker-list" class="cash-tracker-list">
-                    <!-- Populated by JS -->
                 </div>
             </div>
         </section>
