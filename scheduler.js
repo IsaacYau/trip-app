@@ -1009,12 +1009,18 @@ if (typeof document !== 'undefined') {
 
             const members = state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice", "Bob", "Charlie"];
 
-            // Calculate cash spent per member from cash-type expenses
+            // Calculate cash spent per member from cash-type expenses and settlements
             const cashSpent = {};
             members.forEach(m => { cashSpent[m] = 0; });
             state.expenses.forEach(exp => {
-                if (exp.paymentMethod && exp.paymentMethod.type === "cash" && exp.currency === currency) {
-                    if (cashSpent[exp.payer] !== undefined) cashSpent[exp.payer] += exp.amount;
+                if (exp.paymentMethod && exp.paymentMethod.type === "cash") {
+                    const amountInLocal = exp.currency === currency ? exp.amount : (convertToHkd(exp.amount, exp.currency) / (FX_RATES[currency] || 1.0));
+                    if (exp.isSettlement) {
+                        if (cashSpent[exp.payer] !== undefined) cashSpent[exp.payer] += amountInLocal;
+                        if (cashSpent[exp.recipient] !== undefined) cashSpent[exp.recipient] -= amountInLocal;
+                    } else {
+                        if (cashSpent[exp.payer] !== undefined) cashSpent[exp.payer] += exp.amount;
+                    }
                 }
             });
 
@@ -1053,6 +1059,83 @@ if (typeof document !== 'undefined') {
                     renderCashTracker();
                 });
             });
+
+            // Call spending breakdown update
+            updateSpendingBreakdown();
+        }
+
+        // Calculate and update spending breakdown
+        function updateSpendingBreakdown() {
+            const list = document.getElementById("spending-breakdown-list");
+            if (!list) return;
+
+            const members = state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice", "Bob", "Charlie"];
+            
+            list.innerHTML = members.map(m => {
+                let cashPaid = 0;
+                let epayPaid = 0;
+                let transitPaid = 0;
+                let localTotal = 0;
+                let globalShareTotal = 0;
+
+                state.expenses.forEach(exp => {
+                    if (exp.isSettlement) return;
+
+                    const amtHkd = convertToHkd(exp.amount, exp.currency);
+
+                    if (exp.payer === m) {
+                        const pmType = exp.paymentMethod ? exp.paymentMethod.type : "cash";
+                        if (pmType === "cash") cashPaid += amtHkd;
+                        else if (pmType === "epayment") epayPaid += amtHkd;
+                        else if (pmType === "transit") transitPaid += amtHkd;
+                    }
+
+                    if (exp.type === "local") {
+                        if (exp.payer === m) {
+                            localTotal += amtHkd;
+                        }
+                    } else if (exp.type === "global") {
+                        if (exp.splitAmong && exp.splitAmong.includes(m)) {
+                            const ratio = (exp.splitRatios && exp.splitRatios[m]) || 0;
+                            globalShareTotal += amtHkd * (ratio / 100);
+                        } else if (!exp.splitAmong) {
+                            const numMembers = members.length || 1;
+                            globalShareTotal += amtHkd / numMembers;
+                        }
+                    }
+                });
+
+                const totalPaidDirect = cashPaid + epayPaid + transitPaid;
+                const theoreticalTotal = localTotal + globalShareTotal;
+
+                return `
+                <div class="spending-member-card" style="flex:1; min-width:200px; padding:0.5rem; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:0.75rem;">
+                    <div style="font-weight:700; color:var(--text-primary); border-bottom:1px solid var(--border); padding-bottom:0.25rem; margin-bottom:0.4rem; display:flex; justify-content:space-between;">
+                        <span>👤 ${m}</span>
+                        <span style="color:var(--accent);">Theoretical: HKD $${theoreticalTotal.toFixed(2)}</span>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:0.2rem; color:var(--text-secondary);">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>💵 Cash paid directly:</span>
+                            <strong style="color:var(--text-primary);">HKD $${cashPaid.toFixed(2)}</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>📱 ePayment paid directly:</span>
+                            <strong style="color:var(--text-primary);">HKD $${epayPaid.toFixed(2)}</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>🚇 Transit paid directly:</span>
+                            <strong style="color:var(--text-primary);">HKD $${transitPaid.toFixed(2)}</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--border); padding-top:0.2rem; margin-top:0.25rem; font-weight:700;">
+                            <span>💰 Total directly paid:</span>
+                            <span style="color:var(--text-primary);">HKD $${totalPaidDirect.toFixed(2)}</span>
+                        </div>
+                    </div>
+                </div>`;
+            }).join("");
+            
+            if (window.lucide) window.lucide.createIcons();
         }
 
         // Deduct cash balance for a payer (called on local cash expenses)
