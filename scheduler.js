@@ -204,6 +204,55 @@ function findDijkstraRoute(destination, start, end, criteria) {
     };
 }
 
+// Nominatim Geocoding service (100% Free)
+async function fetchCoordinates(query) {
+    if (!query || query.trim() === "") return null;
+    try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+        const response = await fetch(url, {
+            headers: {
+                "Accept": "application/json",
+                "User-Agent": "RoamReadyTravelPlanner/1.0"
+            }
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data && data.length > 0) {
+            return {
+                lat: parseFloat(data[0].lat),
+                lon: parseFloat(data[0].lon),
+                displayName: data[0].display_name
+            };
+        }
+    } catch (e) {
+        console.error("Geocoding failed for query: " + query, e);
+    }
+    return null;
+}
+
+// OSRM Routing service (100% Free for walking/cycling)
+async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
+    // mode can be "foot" or "bicycle"
+    if (!startCoord || !endCoord) return null;
+    try {
+        const url = `https://router.project-osrm.org/route/v1/${mode}/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`;
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data && data.routes && data.routes.length > 0) {
+            const route = data.routes[0];
+            return {
+                coordinates: route.geometry.coordinates.map(c => [c[1], c[0]]), // Mapbox [lon, lat] -> Leaflet [lat, lon]
+                duration: Math.round(route.duration / 60), // convert seconds to minutes
+                distance: parseFloat((route.distance / 1000).toFixed(2)) // convert meters to km
+            };
+        }
+    } catch (e) {
+        console.error("OSRM routing failed", e);
+    }
+    return null;
+}
+
 // Pure Debt Settlement Splitter — supports dynamic group members and custom splitAmong/splitRatios
 function calculateDebtSettlement(expenses, members) {
     if (!members || members.length === 0) members = ["Alice", "Bob", "Charlie"];
@@ -3775,6 +3824,8 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         convertToHkd,
         findDijkstraRoute,
+        fetchCoordinates,
+        fetchOsrmRoute,
         calculateDebtSettlement,
         TRANSIT_NETWORKS,
         FX_RATES,

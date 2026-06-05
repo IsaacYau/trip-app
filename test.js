@@ -94,6 +94,8 @@ vm.runInContext(code, sandbox);
 const {
     convertToHkd,
     findDijkstraRoute,
+    fetchCoordinates,
+    fetchOsrmRoute,
     calculateDebtSettlement,
     FX_RATES,
     timeToMinutes,
@@ -107,6 +109,7 @@ const {
 
 console.log("=== RUNNING ROAMREADY AUTOMATED TDD TESTS ===");
 
+(async () => {
 try {
     // -------------------------------------------------------------------------
     // TEST 1: Currency Conversion
@@ -495,6 +498,56 @@ try {
     console.log("✅ Local expense payment methods verified!");
 
     // -------------------------------------------------------------------------
+    // TEST 19: Nominatim Geocoding and OSRM Routing Parsing
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 19] Testing Nominatim Geocoding and OSRM Routing Parsing...");
+    
+    const originalFetch = sandbox.fetch;
+    sandbox.fetch = async (url, options) => {
+        if (url.includes("nominatim")) {
+            return {
+                ok: true,
+                json: async () => [{
+                    lat: "35.17091",
+                    lon: "136.88153",
+                    display_name: "Nagoya Station, Nagoya, Japan"
+                }]
+            };
+        }
+        if (url.includes("router.project-osrm.org")) {
+            return {
+                ok: true,
+                json: async () => ({
+                    routes: [{
+                        geometry: {
+                            coordinates: [[136.88153, 35.17091], [136.90827, 35.16979]]
+                        },
+                        duration: 300,
+                        distance: 2500
+                    }]
+                })
+            };
+        }
+        return { ok: false };
+    };
+
+    const coords = await fetchCoordinates("Nagoya Station");
+    assert.ok(coords);
+    assert.strictEqual(coords.lat, 35.17091);
+    assert.strictEqual(coords.lon, 136.88153);
+    assert.strictEqual(coords.displayName, "Nagoya Station, Nagoya, Japan");
+
+    const osrmRoute = await fetchOsrmRoute({ lat: 35.17091, lon: 136.88153 }, { lat: 35.16979, lon: 136.90827 }, "foot");
+    assert.ok(osrmRoute);
+    assert.strictEqual(osrmRoute.duration, 5);
+    assert.strictEqual(osrmRoute.distance, 2.5);
+    assert.strictEqual(JSON.stringify(osrmRoute.coordinates), JSON.stringify([[35.17091, 136.88153], [35.16979, 136.90827]]));
+
+    sandbox.fetch = originalFetch;
+    console.log("✅ Geocoding and routing helper parsing tests passed!");
+
+
+    // -------------------------------------------------------------------------
     // TEST 6: DOMContentLoaded Bootstrap Runner
     // -------------------------------------------------------------------------
     console.log("\n[Test 6] Testing DOMContentLoaded Bootstrap lifecycle...");
@@ -512,3 +565,4 @@ try {
     console.error("\n❌ TEST FAILED:", err);
     process.exit(1);
 }
+})();
