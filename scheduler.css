@@ -1065,6 +1065,7 @@ select:focus {
 .category-chips {
     display: flex;
     gap: 0.4rem;
+    flex-wrap: wrap;
 }
 
 .chip {
@@ -2369,7 +2370,7 @@ select:focus {
     accent-color: var(--accent);
     cursor: pointer;
     height: 4px;
-    min-width: 80px;
+    min-width: 40px;
 }
 
 .split-pct-label {
