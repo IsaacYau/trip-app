@@ -1300,15 +1300,9 @@ select:focus {
 
 /* Wallet and Estimator Styling */
 .wallet-grid {
-    display: grid;
-    grid-template-columns: 1.25fr 0.75fr;
+    display: flex;
+    flex-direction: column;
     gap: 1.5rem;
-}
-
-@media (max-width: 992px) {
-    .wallet-grid {
-        grid-template-columns: 1fr;
-    }
 }
 
 .wallet-currency-badge {

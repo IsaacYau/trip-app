@@ -869,14 +869,14 @@ if (typeof document !== 'undefined') {
                         
                         const amt = (totalAmount * pct / 100).toFixed(2);
                         if (document.activeElement !== amtInput) {
-                            amtInput.value = amt;
+                            amtInput.value = parseFloat(amt) === 0 ? "" : amt;
                         }
                     } else {
                         slider.disabled = true;
                         amtInput.disabled = true;
                         slider.value = 0;
                         pctLabel.textContent = "0%";
-                        amtInput.value = "0.00";
+                        amtInput.value = "";
                     }
                 });
                 totalEl.textContent = sum;
@@ -950,6 +950,9 @@ if (typeof document !== 'undefined') {
                     let pct = Math.round((typedAmt / totalAmount) * 100);
                     pct = Math.max(0, Math.min(100, pct));
                     distributeDifference(amtInput.dataset.member, pct);
+                });
+                amtInput.addEventListener("focus", () => {
+                    amtInput.select();
                 });
             });
 
