@@ -1,7 +1,9 @@
 | id | task | status | notes |
 | --- | --- | --- | --- |
-| task-01 | Position cash tracker at top and improve CSS mobile responsiveness | completed | |
-| task-02 | Enable payment method panel for global split expenses | completed | |
-| task-03 | Implement split input redistribution and exact split amounts | completed | |
-| task-04 | Settle up cash balance adjustment and expense breakdown summary | completed | |
-| task-05 | Commit changes to branch | completed | |
+| task-01 | Explore project context | completed | Read existing transit routing code and database to understand architecture |
+| task-02 | Ask clarifying questions | completed | Ask the user one clarifying question at a time |
+| task-03 | Propose 2-3 approaches | completed | Propose options for free routing engine, APIs, and map integration |
+| task-04 | Present design | in_progress | Present design sections and gather feedback |
+| task-05 | Write design doc | pending | Write and commit design doc |
+| task-06 | Transition to implementation | pending | Invoke writing-plans skill |
+
