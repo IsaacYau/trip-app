@@ -1,27 +1,6 @@
-# TODO List for Interactive Travel Scheduler
-
-## Features to Implement
-- [x] Add functionality to edit existing activities.
-  - **Completed:** Users can now click on an activity to edit its details.
-- [x] Implement a feature to delete activities.
-  - **Completed:** Users can now delete activities using a delete button.
-- [x] Allow users to set reminders for activities.
-  - **Completed:** Users can now enable alert notifications for activities with configurable offset times.
-- [x] Enhance the UI for better user experience.
-  - **Completed:** Built a premium, responsive Single Page Application shell featuring high-fidelity dark/light themes, custom activity modals, and reminder notifications.
-
-## Bugs to Fix
-- [x] Fix time conflict detection logic.
-  - **Completed:** Implemented mathematical overlap algorithm (`Start1 < End2 AND Start2 < End1`) to alert on overlapping hours.
-- [x] Ensure activities are saved correctly in local storage.
-  - **Completed:** Refactored persistence layer to store structured JSON arrays instead of fragile innerHTML caching.
-
-## Completed Premium Features
-- [x] Implement Subway Graph Node Optimizer (Nagoya, Osaka, Kobe & Kuala Lumpur, Penang) and Didi Ride Estimator (Shenzhen) in Tab 2.
-- [x] Implement Nearby Popular Places lookup (Dianping, Tabelog, OpenRice integrations) with GPS Geolocation Distance-ranking in Tab 3.
-- [x] Implement Shared Wallet & IC Card Estimator (HKD Ledger with conversions, Suica/Touch 'n Go/Shenzhen Tong skins, greedy debt settling) in Tab 4.
-- [x] Implement real-time multi-tab collaborative editing using HTML5 storage sync.
-
-## Future Improvements
-- [ ] Add a feature to sync schedules with a calendar service.
-- [ ] Implement secure database user authentication (e.g. Supabase/Firebase) for saving schedules.
+1. Implement Vanilla JS routing function to ping OpenRouteService.
+2. Hardcode the ORS_API_KEY.
+3. Connect the "Add Route" button to the function.
+4. Test the routing logic.
+5. read all the files, especially .agent folder guides you and teaches you how to use the skills. we are making a mobile trip app, on feat/wallet-v2 branch on updating the wallet feature, check to see if all of these tasks have been completed or not, if not do it or if you find bugs fix it. first remove the simulate friend edit function, since we are implementing the system in real scenarios. the expense title, when the user type a letter, guess it and let the user choose the word, build a common keywords for this, such as breakfast, lunch, dinner, snacks etc, and it should be optional to fill in. selecting expense type for global (shared split) should let users to select who are they splitting among, since a group of 3 could have a situation that only 2 of them has to split the bill, and a slider bar of amount of money can be selected for how much is splitted, but default should be 50% for 2 people, 33% for 3 people etc. for local (personal), you should let user select it is paid by cash/epayment/transit card, since cash is limited, epayment could be alipayhk/payme/credit card, which has fair amount to spend, and transit card is separated since we have to check whether top up is needed, this will link to the transportation optimizer in the future. the category should be compulsory to choose and in a higher priority than expense title, which expense title should act more like a description for the expense. the currency should follow the group country settings, which for example group A is going to jp, then currency only has to be JPY and no need to change. the paid by option should let user to select anyone inside the group, so that another user can help the payer to add the expense. the expense dialog should be set day by day, so that it doesnt grow exponentially, user should be able to switch from one day to another to add the expense, but default is add on the date of today, follow jp time for jp trip and ml time for ml trip. local expense should be only visible for the account of "paid by". the expenses and shared settle up summary should follow the currency of the country as primary, hkd as secondary, and the debt and creditor should smartly add up or deduct, if A owes B 300, C owes A 400, then should show C owes B 300, C owes A 100, users can choose clearing debt with cash/epayment. you should let user input their initial total amount of cash then deduct it once user paid any expenses/debt with cash, then show the users total expenses, and theorectical total expenses which includes the debt. let users view different passengers in the transit card, input their initial card balance. the recharge simulator is good, but u may give an option for users to type in the exact amount as well.
+6. test if it work on the branch, only push and commit on the branch at last but never merge it to the main

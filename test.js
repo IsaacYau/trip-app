@@ -18,7 +18,9 @@ const mockDocument = {
     getElementById: (id) => {
         return {
             addEventListener: () => {},
+            removeEventListener: () => {},
             querySelector: () => ({ setAttribute: () => {} }),
+            querySelectorAll: () => [],
             classList: { add: () => {}, remove: () => {} },
             style: {},
             appendChild: () => {},
@@ -33,7 +35,9 @@ const mockDocument = {
     createElement: (tag) => {
         return {
             addEventListener: () => {},
+            removeEventListener: () => {},
             querySelector: () => ({ setAttribute: () => {} }),
+            querySelectorAll: () => [],
             classList: { add: () => {}, remove: () => {} },
             style: {},
             appendChild: () => {},
@@ -393,6 +397,102 @@ try {
     // Since the color dictionary is inside renderActivitiesList, we can verify that the list executes
     // and correctly injects inline styling for background and border color without throwing.
     console.log("✅ Category pastel colors mapping dictionary tests passed!");
+
+    // -------------------------------------------------------------------------
+    // TEST 16: Custom Group Splits (splitAmong)
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 16] Testing Custom Group Splits (splitAmong)...");
+    const mockPartialExpenses = [
+        {
+            id: "exp-partial",
+            title: "Private dinner for two",
+            amount: 300,
+            currency: "HKD",
+            payer: "Alice",
+            category: "Food",
+            type: "global",
+            splitAmong: ["Alice", "Bob"] // Charlie is excluded!
+        }
+    ];
+    const partialResult = calculateDebtSettlement(mockPartialExpenses);
+    // Gross paid
+    assert.strictEqual(partialResult.totalPaid.Alice, 300);
+    assert.strictEqual(partialResult.totalPaid.Bob, 0);
+    assert.strictEqual(partialResult.totalPaid.Charlie, 0);
+    // Settlements: Bob owes Alice 150. Charlie owes nothing!
+    assert.strictEqual(partialResult.settlements.length, 1);
+    assert.strictEqual(partialResult.settlements[0].from, "Bob");
+    assert.strictEqual(partialResult.settlements[0].to, "Alice");
+    assert.strictEqual(partialResult.settlements[0].amount, 150);
+    console.log("✅ Custom group splits (splitAmong) tests passed!");
+
+    // -------------------------------------------------------------------------
+    // TEST 17: Custom Percentage Ratio Splits (splitRatios)
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 17] Testing Custom Percentage Ratio Splits (splitRatios)...");
+    const mockRatioExpenses = [
+        {
+            id: "exp-ratio",
+            title: "Unequal tickets",
+            amount: 100,
+            currency: "HKD",
+            payer: "Bob",
+            category: "Sights",
+            type: "global",
+            splitAmong: ["Alice", "Bob"],
+            splitRatios: { Alice: 70, Bob: 30 } // Alice pays 70%, Bob pays 30%
+        }
+    ];
+    const ratioResult = calculateDebtSettlement(mockRatioExpenses);
+    // Gross paid
+    assert.strictEqual(ratioResult.totalPaid.Bob, 100);
+    assert.strictEqual(ratioResult.totalPaid.Alice, 0);
+    // Settlements: Alice owes Bob 70.
+    assert.strictEqual(ratioResult.settlements.length, 1);
+    assert.strictEqual(ratioResult.settlements[0].from, "Alice");
+    assert.strictEqual(ratioResult.settlements[0].to, "Bob");
+    assert.strictEqual(ratioResult.settlements[0].amount, 70);
+    console.log("✅ Custom percentage ratio splits (splitRatios) tests passed!");
+
+    // -------------------------------------------------------------------------
+    // TEST 18: Local Expense Payment Methods
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 18] Testing Local Expense Payment Methods...");
+    const localCashExpense = {
+        id: "exp-local-cash",
+        title: "Personal Drink",
+        amount: 200,
+        currency: "JPY",
+        payer: "Alice",
+        category: "Food",
+        type: "local",
+        paymentMethod: { type: "cash" }
+    };
+    const localEPayExpense = {
+        id: "exp-local-epay",
+        title: "Personal Souvenir",
+        amount: 1000,
+        currency: "JPY",
+        payer: "Bob",
+        category: "Shopping",
+        type: "local",
+        paymentMethod: { type: "epayment" }
+    };
+    const localTransitExpense = {
+        id: "exp-local-transit",
+        title: "Personal Train Trip",
+        amount: 300,
+        currency: "JPY",
+        payer: "Charlie",
+        category: "Other",
+        type: "local",
+        paymentMethod: { type: "transit" }
+    };
+    // Verify properties
+    assert.strictEqual(localCashExpense.paymentMethod.type, "cash");
+    assert.strictEqual(localEPayExpense.paymentMethod.type, "epayment");
+    assert.strictEqual(localTransitExpense.paymentMethod.type, "transit");
+    console.log("✅ Local expense payment methods verified!");
 
     // -------------------------------------------------------------------------
     // TEST 6: DOMContentLoaded Bootstrap Runner

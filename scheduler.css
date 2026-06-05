@@ -1065,6 +1065,7 @@ select:focus {
 .category-chips {
     display: flex;
     gap: 0.4rem;
+    flex-wrap: wrap;
 }
 
 .chip {
@@ -1300,15 +1301,9 @@ select:focus {
 
 /* Wallet and Estimator Styling */
 .wallet-grid {
-    display: grid;
-    grid-template-columns: 1.25fr 0.75fr;
+    display: flex;
+    flex-direction: column;
     gap: 1.5rem;
-}
-
-@media (max-width: 768px) {
-    .wallet-grid {
-        grid-template-columns: 1fr;
-    }
 }
 
 .wallet-currency-badge {
@@ -1333,7 +1328,7 @@ select:focus {
 
 .expense-form .form-row {
     display: grid;
-    grid-template-columns: 1.2fr 0.8fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 0.65rem;
 }
 
@@ -1343,7 +1338,7 @@ select:focus {
     gap: 0.65rem;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
     .expense-form .form-row,
     .form-row-three {
         grid-template-columns: 1fr;
@@ -1624,6 +1619,7 @@ select:focus {
 .recharge-buttons {
     display: flex;
     gap: 0.4rem;
+    flex-wrap: wrap;
 }
 
 .recharge-buttons button {
@@ -2260,5 +2256,398 @@ select:focus {
     background-color: rgba(99, 102, 241, 0.04) !important;
 }
 
+/* ============================================================
+   WALLET V2: Day Selector Strip
+   ============================================================ */
+.day-selector-strip {
+    display: flex;
+    gap: 0.4rem;
+    overflow-x: auto;
+    padding: 0.5rem 0 0.75rem 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    margin-bottom: 0.25rem;
+}
 
+.day-pill {
+    flex-shrink: 0;
+    padding: 0.3rem 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
 
+.day-pill:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.day-pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 700;
+}
+
+.day-pill.today:not(.active) {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-light);
+}
+
+/* ============================================================
+   WALLET V2: Split Config Panel
+   ============================================================ */
+.split-config-panel {
+    background: var(--bg-primary);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    animation: fadeInDown 0.2s ease;
+}
+
+.split-panel-title,
+.payment-method-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.split-members-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.split-member-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.split-member-label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 5rem;
+    cursor: pointer;
+}
+
+.split-member-label input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+}
+
+.split-slider-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.split-slider {
+    flex: 1;
+    accent-color: var(--accent);
+    cursor: pointer;
+    height: 4px;
+    min-width: 40px;
+}
+
+.split-pct-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 2.2rem;
+    text-align: right;
+}
+
+.split-amount-input {
+    width: 65px;
+    padding: 0.15rem 0.3rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: right;
+    margin-left: 0.3rem;
+}
+
+.split-total-indicator {
+    margin-top: 0.6rem;
+    font-size: 0.73rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.split-warn {
+    font-size: 0.7rem;
+    color: var(--danger);
+    font-weight: 700;
+}
+
+/* ============================================================
+   WALLET V2: Payment Method Panel
+   ============================================================ */
+.payment-method-panel {
+    background: var(--bg-primary);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    animation: fadeInDown 0.2s ease;
+}
+
+.payment-options {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.payment-option-label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 0.3rem 0.6rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+
+.payment-option-label:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    color: var(--accent);
+}
+
+.payment-option-label input[type="radio"] {
+    accent-color: var(--accent);
+}
+
+.pay-opt-text {
+    font-size: 0.78rem;
+}
+
+.epayment-subtypes {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.4rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid var(--border);
+}
+
+.info-note {
+    font-size: 0.73rem;
+    color: var(--text-secondary);
+    background: var(--accent-light);
+    border-left: 3px solid var(--accent);
+    padding: 0.4rem 0.6rem;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    margin-top: 0.5rem;
+}
+
+/* ============================================================
+   WALLET V2: Optional label
+   ============================================================ */
+.optional-label {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-style: italic;
+}
+
+/* ============================================================
+   WALLET V2: Ledger Day Header
+   ============================================================ */
+.ledger-day-header {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 0.35rem 0.5rem;
+    margin: 0.5rem 0 0.25rem 0;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-light);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    color: var(--accent-dark);
+}
+
+/* ============================================================
+   WALLET V2: Cash Balance Tracker
+   ============================================================ */
+.cash-tracker-card {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    border: 1.5px solid var(--border);
+}
+
+.cash-tracker-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.cash-tracker-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.cash-tracker-name {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    min-width: 4rem;
+}
+
+.cash-tracker-inputs {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.cash-label {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.cash-initial-input {
+    width: 80px;
+    padding: 0.25rem 0.4rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-family: var(--font-primary);
+}
+
+.cash-tracker-balances {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin-left: auto;
+    text-align: right;
+}
+
+.cash-spent {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.cash-remaining {
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.cash-positive {
+    color: var(--success);
+}
+
+.cash-negative {
+    color: var(--danger);
+}
+
+/* ============================================================
+   WALLET V2: IC Card Initial Balance + Custom Recharge
+   ============================================================ */
+.ic-initial-balance-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    margin-bottom: 0.25rem;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.ic-initial-input-group {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ic-initial-input-group input {
+    width: 90px;
+    padding: 0.25rem 0.4rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-family: var(--font-primary);
+}
+
+#ic-currency-symbol {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.custom-recharge-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--border);
+}
+
+.custom-recharge-input {
+    flex: 1;
+    max-width: 120px;
+    padding: 0.3rem 0.5rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-family: var(--font-primary);
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
