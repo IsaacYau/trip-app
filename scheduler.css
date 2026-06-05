@@ -1305,7 +1305,7 @@ select:focus {
     gap: 1.5rem;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 992px) {
     .wallet-grid {
         grid-template-columns: 1fr;
     }
@@ -1624,6 +1624,7 @@ select:focus {
 .recharge-buttons {
     display: flex;
     gap: 0.4rem;
+    flex-wrap: wrap;
 }
 
 .recharge-buttons button {

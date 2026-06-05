@@ -845,7 +845,7 @@ if (typeof document !== 'undefined') {
                     <div class="split-slider-group">
                         <input type="range" class="split-slider" data-member="${m}" min="0" max="100" step="1" value="${pct}">
                         <span class="split-pct-label" id="pct-${m}">${pct}%</span>
-                        <input type="number" class="split-amount-input" data-member="${m}" min="0" step="0.01" placeholder="0.00" value="0.00">
+                        <input type="number" class="split-amount-input" data-member="${m}" min="0" step="0.01" placeholder="0.00">
                     </div>
                 </div>`;
             }).join("");
@@ -943,7 +943,7 @@ if (typeof document !== 'undefined') {
             });
 
             list.querySelectorAll(".split-amount-input").forEach(amtInput => {
-                amtInput.addEventListener("input", () => {
+                amtInput.addEventListener("change", () => {
                     const totalAmount = parseFloat(expenseAmountInput.value) || 0;
                     if (totalAmount <= 0) return;
                     const typedAmt = parseFloat(amtInput.value) || 0;
@@ -1069,6 +1069,16 @@ if (typeof document !== 'undefined') {
             const list = document.getElementById("spending-breakdown-list");
             if (!list) return;
 
+            const currency = state.destination === "japan" ? "JPY" : state.destination === "malaysia" ? "MYR" : "CNY";
+            const symbol = currency === "JPY" ? "¥" : currency === "MYR" ? "RM" : "¥";
+            const rate = FX_RATES[currency] || 1.0;
+
+            const formatAmount = (valHkd) => {
+                const valLocal = valHkd / rate;
+                const localFormatted = currency === "JPY" ? Math.round(valLocal).toLocaleString() : valLocal.toFixed(2);
+                return `${symbol}${localFormatted} (HKD $${valHkd.toFixed(2)})`;
+            };
+
             const members = state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice", "Bob", "Charlie"];
             
             list.innerHTML = members.map(m => {
@@ -1110,26 +1120,26 @@ if (typeof document !== 'undefined') {
 
                 return `
                 <div class="spending-member-card" style="flex:1; min-width:200px; padding:0.5rem; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:0.75rem;">
-                    <div style="font-weight:700; color:var(--text-primary); border-bottom:1px solid var(--border); padding-bottom:0.25rem; margin-bottom:0.4rem; display:flex; justify-content:space-between;">
+                    <div style="font-weight:700; color:var(--text-primary); border-bottom:1px solid var(--border); padding-bottom:0.25rem; margin-bottom:0.4rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.2rem;">
                         <span>👤 ${m}</span>
-                        <span style="color:var(--accent);">Theoretical: HKD $${theoreticalTotal.toFixed(2)}</span>
+                        <span style="color:var(--accent);">Theoretical: ${formatAmount(theoreticalTotal)}</span>
                     </div>
                     <div style="display:flex; flex-direction:column; gap:0.2rem; color:var(--text-secondary);">
-                        <div style="display:flex; justify-content:space-between;">
+                        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.2rem;">
                             <span>💵 Cash paid directly:</span>
-                            <strong style="color:var(--text-primary);">HKD $${cashPaid.toFixed(2)}</strong>
+                            <strong style="color:var(--text-primary);">${formatAmount(cashPaid)}</strong>
                         </div>
-                        <div style="display:flex; justify-content:space-between;">
+                        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.2rem;">
                             <span>📱 ePayment paid directly:</span>
-                            <strong style="color:var(--text-primary);">HKD $${epayPaid.toFixed(2)}</strong>
+                            <strong style="color:var(--text-primary);">${formatAmount(epayPaid)}</strong>
                         </div>
-                        <div style="display:flex; justify-content:space-between;">
+                        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.2rem;">
                             <span>🚇 Transit paid directly:</span>
-                            <strong style="color:var(--text-primary);">HKD $${transitPaid.toFixed(2)}</strong>
+                            <strong style="color:var(--text-primary);">${formatAmount(transitPaid)}</strong>
                         </div>
-                        <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--border); padding-top:0.2rem; margin-top:0.25rem; font-weight:700;">
+                        <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--border); padding-top:0.2rem; margin-top:0.25rem; font-weight:700; flex-wrap:wrap; gap:0.2rem;">
                             <span>💰 Total directly paid:</span>
-                            <span style="color:var(--text-primary);">HKD $${totalPaidDirect.toFixed(2)}</span>
+                            <span style="color:var(--text-primary);">${formatAmount(totalPaidDirect)}</span>
                         </div>
                     </div>
                 </div>`;
