@@ -10,9 +10,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Leaflet.js Mapping Assets -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="scheduler.css">
     <!-- Local decapsulated configuration -->
     <script type="module" src="config.js"></script>
+
 </head>
 <body>
     <!-- Premium Top Bar -->
@@ -118,6 +122,14 @@
             </div>
             
             <div id="transit-container" class="transit-grid">
+                <!-- Interactive Map Card -->
+                <div class="card map-card" style="grid-row: span 2; display: flex; flex-direction: column; min-height: 450px;">
+                    <div class="card-header">
+                        <h3 class="card-title"><i data-lucide="map"></i> Interactive Map</h3>
+                    </div>
+                    <div id="transit-map" style="flex: 1; min-height: 380px; border-radius: var(--radius-sm); border: 1px solid var(--border); z-index: 1;"></div>
+                </div>
+
                 <!-- Transit Form -->
                 <div class="card transit-card">
                     <div class="card-header">
@@ -125,25 +137,32 @@
                     </div>
                     <form id="transit-form" class="modal-form">
                         <div class="form-group">
-                            <label for="transit-start">Start Station</label>
-                            <select id="transit-start" required></select>
+                            <label for="transit-start-query">Start Location / Station</label>
+                            <input type="text" id="transit-start-query" placeholder="Search station, address or click map..." required autocomplete="off">
+                            <input type="hidden" id="transit-start-coords">
                         </div>
                         <div class="form-group">
-                            <label for="transit-end">End Station</label>
-                            <select id="transit-end" required></select>
+                            <label for="transit-end-query">End Location / Station</label>
+                            <input type="text" id="transit-end-query" placeholder="Search destination, address or click map..." required autocomplete="off">
+                            <input type="hidden" id="transit-end-coords">
                         </div>
                         
-                        <div class="form-group" id="transit-criteria-container">
-                            <label for="transit-criteria">Optimization Criteria</label>
-                            <div class="toggle-switch-container">
+                        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="form-group">
+                                <label for="transit-travel-date">Travel Date</label>
+                                <input type="date" id="transit-travel-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="transit-criteria">Optimization</label>
                                 <select id="transit-criteria">
-                                    <option value="time">Fastest Travel Time</option>
-                                    <option value="transfers">Fewest Line Transfers</option>
+                                    <option value="optimized">⚖️ Balanced (Optimized)</option>
+                                    <option value="time">🏎️ Fastest Route</option>
+                                    <option value="fare">💰 Cheapest Route</option>
                                 </select>
                             </div>
                         </div>
 
-                        <!-- Taxi Fare Estimator for Shenzhen -->
+                        <!-- Taxi Fare Estimator for Shenzhen (hidden as China is ignored, but kept for compatibility) -->
                         <div class="form-group" id="taxi-type-container" style="display: none;">
                             <label for="taxi-type">Didi Car Class</label>
                             <select id="taxi-type">
@@ -158,6 +177,7 @@
                         </button>
                     </form>
                 </div>
+
 
                 <!-- Transit Results -->
                 <div class="card transit-results-card">
