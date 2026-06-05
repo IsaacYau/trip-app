@@ -909,11 +909,10 @@ if (typeof document !== 'undefined') {
             const payPanel = document.getElementById("payment-method-panel");
             if (type === "global") {
                 if (splitPanel) splitPanel.style.display = "block";
-                if (payPanel) payPanel.style.display = "none";
             } else {
                 if (splitPanel) splitPanel.style.display = "none";
-                if (payPanel) payPanel.style.display = "block";
             }
+            if (payPanel) payPanel.style.display = "block";
         }
 
         // Render cash balance tracker
@@ -928,11 +927,11 @@ if (typeof document !== 'undefined') {
 
             const members = state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice", "Bob", "Charlie"];
 
-            // Calculate cash spent per member from cash-type local expenses
+            // Calculate cash spent per member from cash-type expenses
             const cashSpent = {};
             members.forEach(m => { cashSpent[m] = 0; });
             state.expenses.forEach(exp => {
-                if (exp.type === "local" && exp.paymentMethod && exp.paymentMethod.type === "cash" && exp.currency === currency) {
+                if (exp.paymentMethod && exp.paymentMethod.type === "cash" && exp.currency === currency) {
                     if (cashSpent[exp.payer] !== undefined) cashSpent[exp.payer] += exp.amount;
                 }
             });
@@ -2674,34 +2673,34 @@ if (typeof document !== 'undefined') {
                 date: new Date().toLocaleDateString()
             };
 
+            // Read payment method for all expenses
+            const payMethodRadio = document.querySelector('input[name="pay-method"]:checked');
+            const payMethod = payMethodRadio ? payMethodRadio.value : "cash";
+            let subType = null;
+            if (payMethod === "epayment") {
+                const subRadio = document.querySelector('input[name="epay-sub"]:checked');
+                subType = subRadio ? subRadio.value : "alipayhk";
+            }
+            exp.paymentMethod = { type: payMethod, subType };
+
             if (type === "global") {
                 const splitConfig = getSplitConfig();
                 if (splitConfig) {
                     exp.splitAmong = splitConfig.splitAmong;
                     exp.splitRatios = splitConfig.splitRatios;
                 }
-            } else {
-                // Local expense: read payment method
-                const payMethodRadio = document.querySelector('input[name="pay-method"]:checked');
-                const payMethod = payMethodRadio ? payMethodRadio.value : "cash";
-                let subType = null;
-                if (payMethod === "epayment") {
-                    const subRadio = document.querySelector('input[name="epay-sub"]:checked');
-                    subType = subRadio ? subRadio.value : "alipayhk";
-                }
-                exp.paymentMethod = { type: payMethod, subType };
+            }
 
-                // For cash: warn if balance is insufficient
-                if (payMethod === "cash" && state.cashBalances[payer]) {
-                    const cashCur = state.destination === "japan" ? "JPY" : state.destination === "malaysia" ? "MYR" : "CNY";
-                    if (currency === cashCur) {
-                        const remaining = (state.cashBalances[payer].initial || 0) -
-                            state.expenses.filter(ex => ex.type === "local" && ex.paymentMethod && ex.paymentMethod.type === "cash" && ex.currency === cashCur && ex.payer === payer)
-                            .reduce((sum, ex) => sum + ex.amount, 0);
-                        if (remaining - amount < 0) {
-                            const sym = currency === "MYR" ? "RM" : "¥";
-                            showToast("⚠️ Low Cash", `${payer}'s cash balance will go negative after this expense (${sym}${(remaining - amount).toFixed(0)})`);
-                        }
+            // For cash: warn if balance is insufficient
+            if (payMethod === "cash" && state.cashBalances[payer]) {
+                const cashCur = state.destination === "japan" ? "JPY" : state.destination === "malaysia" ? "MYR" : "CNY";
+                if (currency === cashCur) {
+                    const remaining = (state.cashBalances[payer].initial || 0) -
+                        state.expenses.filter(ex => ex.paymentMethod && ex.paymentMethod.type === "cash" && ex.currency === cashCur && ex.payer === payer)
+                        .reduce((sum, ex) => sum + ex.amount, 0);
+                    if (remaining - amount < 0) {
+                        const sym = currency === "MYR" ? "RM" : "¥";
+                        showToast("⚠️ Low Cash", `${payer}'s cash balance will go negative after this expense (${sym}${(remaining - amount).toFixed(0)})`);
                     }
                 }
             }
@@ -2790,9 +2789,9 @@ if (typeof document !== 'undefined') {
                                      exp.isSettlement ? "background-color:#dcfce7; color:#166534;" :
                                      "background-color:var(--accent-light); color:var(--accent-dark);";
 
-                    // Payment method badge for local
+                    // Payment method badge
                     let payBadge = "";
-                    if (exp.type === "local" && exp.paymentMethod) {
+                    if (exp.paymentMethod) {
                         const pm = exp.paymentMethod;
                         const payIcon = pm.type === "cash" ? "💵" : pm.type === "transit" ? "🚇" : "📱";
                         const payLabel = pm.type === "cash" ? "Cash" : pm.type === "transit" ? "Transit" : (pm.subType || "ePayment");
