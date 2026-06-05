@@ -2381,8 +2381,21 @@ select:focus {
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--accent);
-    min-width: 2.5rem;
+    min-width: 2.2rem;
     text-align: right;
+}
+
+.split-amount-input {
+    width: 65px;
+    padding: 0.15rem 0.3rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: right;
+    margin-left: 0.3rem;
 }
 
 .split-total-indicator {

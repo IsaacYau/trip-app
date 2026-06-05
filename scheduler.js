@@ -845,15 +845,38 @@ if (typeof document !== 'undefined') {
                     <div class="split-slider-group">
                         <input type="range" class="split-slider" data-member="${m}" min="0" max="100" step="1" value="${pct}">
                         <span class="split-pct-label" id="pct-${m}">${pct}%</span>
+                        <input type="number" class="split-amount-input" data-member="${m}" min="0" step="0.01" placeholder="0.00" value="0.00">
                     </div>
                 </div>`;
             }).join("");
 
-            function recalcTotal() {
+            function recalcAmounts() {
+                const totalAmount = parseFloat(expenseAmountInput.value) || 0;
                 let sum = 0;
-                list.querySelectorAll(".split-slider").forEach(s => {
-                    if (list.querySelector(`.split-checkbox[data-member="${s.dataset.member}"]`).checked) {
-                        sum += parseInt(s.value, 10);
+                list.querySelectorAll(".split-member-row").forEach(row => {
+                    const cb = row.querySelector(".split-checkbox");
+                    const slider = row.querySelector(".split-slider");
+                    const amtInput = row.querySelector(".split-amount-input");
+                    const pctLabel = row.querySelector(".split-pct-label");
+                    const m = row.dataset.member;
+
+                    if (cb.checked) {
+                        slider.disabled = false;
+                        amtInput.disabled = false;
+                        const pct = parseInt(slider.value, 10);
+                        sum += pct;
+                        pctLabel.textContent = pct + "%";
+                        
+                        const amt = (totalAmount * pct / 100).toFixed(2);
+                        if (document.activeElement !== amtInput) {
+                            amtInput.value = amt;
+                        }
+                    } else {
+                        slider.disabled = true;
+                        amtInput.disabled = true;
+                        slider.value = 0;
+                        pctLabel.textContent = "0%";
+                        amtInput.value = "0.00";
                     }
                 });
                 totalEl.textContent = sum;
@@ -861,24 +884,83 @@ if (typeof document !== 'undefined') {
                 totalEl.style.color = sum !== 100 ? "var(--error, #ef4444)" : "var(--success, #22c55e)";
             }
 
+            function autoSplitChecked() {
+                const checkedRows = [];
+                list.querySelectorAll(".split-member-row").forEach(row => {
+                    const cb = row.querySelector(".split-checkbox");
+                    if (cb.checked) checkedRows.push(row);
+                });
+
+                const numChecked = checkedRows.length;
+                if (numChecked > 0) {
+                    const basePct = Math.floor(100 / numChecked);
+                    const remainder = 100 - (basePct * numChecked);
+                    checkedRows.forEach((row, idx) => {
+                        const slider = row.querySelector(".split-slider");
+                        slider.value = basePct + (idx === 0 ? remainder : 0);
+                    });
+                }
+                recalcAmounts();
+            }
+
+            function distributeDifference(changedMember, targetPct) {
+                const changedRow = list.querySelector(`.split-member-row[data-member="${changedMember}"]`);
+                const changedSlider = changedRow.querySelector(".split-slider");
+                changedSlider.value = targetPct;
+
+                const otherCheckedRows = [];
+                list.querySelectorAll(".split-member-row").forEach(row => {
+                    const m = row.dataset.member;
+                    const cb = row.querySelector(".split-checkbox");
+                    if (cb.checked && m !== changedMember) {
+                        otherCheckedRows.push(row);
+                    }
+                });
+
+                const numOthers = otherCheckedRows.length;
+                if (numOthers > 0) {
+                    const remainingPct = 100 - targetPct;
+                    const basePct = Math.floor(remainingPct / numOthers);
+                    const remainder = remainingPct - (basePct * numOthers);
+                    otherCheckedRows.forEach((row, idx) => {
+                        const slider = row.querySelector(".split-slider");
+                        slider.value = Math.max(0, basePct + (idx === 0 ? remainder : 0));
+                    });
+                }
+                recalcAmounts();
+            }
+
             list.querySelectorAll(".split-slider").forEach(slider => {
                 slider.addEventListener("input", () => {
-                    document.getElementById(`pct-${slider.dataset.member}`).textContent = slider.value + "%";
-                    recalcTotal();
+                    distributeDifference(slider.dataset.member, parseInt(slider.value, 10));
                 });
             });
 
             list.querySelectorAll(".split-checkbox").forEach(cb => {
                 cb.addEventListener("change", () => {
-                    const row = list.querySelector(`.split-member-row[data-member="${cb.dataset.member}"]`);
-                    const slider = row.querySelector(".split-slider");
-                    slider.disabled = !cb.checked;
-                    if (!cb.checked) { slider.value = 0; document.getElementById(`pct-${cb.dataset.member}`).textContent = "0%"; }
-                    recalcTotal();
+                    autoSplitChecked();
                 });
             });
 
-            recalcTotal();
+            list.querySelectorAll(".split-amount-input").forEach(amtInput => {
+                amtInput.addEventListener("input", () => {
+                    const totalAmount = parseFloat(expenseAmountInput.value) || 0;
+                    if (totalAmount <= 0) return;
+                    const typedAmt = parseFloat(amtInput.value) || 0;
+                    let pct = Math.round((typedAmt / totalAmount) * 100);
+                    pct = Math.max(0, Math.min(100, pct));
+                    distributeDifference(amtInput.dataset.member, pct);
+                });
+            });
+
+            if (expenseAmountInput && typeof expenseAmountInput.removeEventListener === "function") {
+                expenseAmountInput.removeEventListener("input", recalcAmounts);
+            }
+            if (expenseAmountInput && typeof expenseAmountInput.addEventListener === "function") {
+                expenseAmountInput.addEventListener("input", recalcAmounts);
+            }
+
+            autoSplitChecked();
         }
 
         // Read split panel values

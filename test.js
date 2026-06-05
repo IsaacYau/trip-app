@@ -18,6 +18,7 @@ const mockDocument = {
     getElementById: (id) => {
         return {
             addEventListener: () => {},
+            removeEventListener: () => {},
             querySelector: () => ({ setAttribute: () => {} }),
             querySelectorAll: () => [],
             classList: { add: () => {}, remove: () => {} },
@@ -34,6 +35,7 @@ const mockDocument = {
     createElement: (tag) => {
         return {
             addEventListener: () => {},
+            removeEventListener: () => {},
             querySelector: () => ({ setAttribute: () => {} }),
             querySelectorAll: () => [],
             classList: { add: () => {}, remove: () => {} },
