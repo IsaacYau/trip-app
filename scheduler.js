@@ -1967,7 +1967,8 @@ if (typeof document !== 'undefined') {
                 // Add member to group if not already present
                 if (!data.members.includes(state.firebaseUser.uid)) {
                     await updateDoc(docRef, {
-                        members: arrayUnion(state.firebaseUser.uid)
+                        members: arrayUnion(state.firebaseUser.uid),
+                        memberNames: arrayUnion(username)
                     });
                 }
 
@@ -2028,6 +2029,7 @@ if (typeof document !== 'undefined') {
                     password: passwordVal,
                     destination: destinationVal,
                     members: [state.firebaseUser.uid],
+                    memberNames: [username],
                     activities: [],
                     expenses: [],
                     icCards: {}
@@ -2279,7 +2281,8 @@ if (typeof document !== 'undefined') {
 
                     if (!isMember) {
                         await updateDoc(docRef, {
-                            members: arrayUnion(state.firebaseUser.uid)
+                            members: arrayUnion(state.firebaseUser.uid),
+                            memberNames: arrayUnion(username)
                         });
                     }
 
@@ -3550,6 +3553,14 @@ if (typeof document !== 'undefined') {
                             state.groupMembers = Object.values(data.members);
                         }
 
+                        // Self-healing: if the current user's display name is not in memberNames, append it to Firestore
+                        if (state.activeUser && (!data.memberNames || !data.memberNames.includes(state.activeUser))) {
+                            const docRef = doc(db, "trip_networks", groupId);
+                            updateDoc(docRef, {
+                                memberNames: arrayUnion(state.activeUser)
+                            }).catch(err => console.error("Error auto-adding memberName:", err));
+                        }
+
                         if (data.destination) {
                             state.destination = data.destination.toLowerCase();
                             localStorage.setItem("travelDestination", state.destination);
@@ -3652,6 +3663,7 @@ if (typeof document !== 'undefined') {
                         owner: state.firebaseUser.uid,
                         password: password,
                         members: [state.firebaseUser.uid],
+                        memberNames: [state.activeUser || state.firebaseUser.displayName || "Owner"],
                         activities: [],
                         expenses: [],
                         icCards: {}
@@ -3707,7 +3719,8 @@ if (typeof document !== 'undefined') {
                     }
 
                     await updateDoc(docRef, {
-                        members: arrayUnion(state.firebaseUser.uid)
+                        members: arrayUnion(state.firebaseUser.uid),
+                        memberNames: arrayUnion(state.activeUser || state.firebaseUser.displayName || "Member")
                     });
 
                     networkNameInput.value = "";
