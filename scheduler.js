@@ -696,7 +696,8 @@ if (typeof document !== 'undefined') {
                 Alice: { JPY: 2000, MYR: 50, CNY: 100, logs: [] },
                 Bob: { JPY: 2000, MYR: 50, CNY: 100, logs: [] },
                 Charlie: { JPY: 2000, MYR: 50, CNY: 100, logs: [] }
-            }
+            },
+            showAllExpenses: false
         };
 
         let placesDatabase = [];
@@ -955,14 +956,20 @@ if (typeof document !== 'undefined') {
             const today = getTodayTripDay();
             if (!state.selectedExpenseDay) state.selectedExpenseDay = today;
 
-            // Build a range of 7 days around today (3 past, today, 3 future)
-            const days = [];
-            for (let i = -3; i <= 3; i++) {
+            // Gather all dates from recorded expenses
+            const expDates = state.expenses.map(e => e.day || e.date).filter(Boolean);
+            
+            // Build a default range around today
+            const defaultDays = [];
+            for (let i = -5; i <= 2; i++) {
                 const d = new Date(today);
                 d.setDate(d.getDate() + i);
-                const iso = d.toISOString().split("T")[0];
-                days.push(iso);
+                defaultDays.push(d.toISOString().split("T")[0]);
             }
+
+            // Merge unique dates and sort chronologically
+            const allDaysSet = new Set([...defaultDays, ...expDates]);
+            const days = Array.from(allDaysSet).sort();
 
             strip.innerHTML = days.map(iso => {
                 const isToday = iso === today;
@@ -976,6 +983,7 @@ if (typeof document !== 'undefined') {
                 btn.addEventListener("click", () => {
                     state.selectedExpenseDay = btn.dataset.day;
                     renderDaySelector();
+                    renderLedger();
                 });
             });
         }
@@ -2533,11 +2541,19 @@ if (typeof document !== 'undefined') {
 
             // Lock currency to destination
             const currencySelect = document.getElementById("expense-currency");
+            const currencyMap = { japan: "JPY", malaysia: "MYR", china: "CNY" };
+            const destCurrency = currencyMap[state.destination] || "HKD";
+            
             if (currencySelect) {
-                const currencyMap = { japan: "JPY", malaysia: "MYR", china: "CNY" };
-                const destCurrency = currencyMap[state.destination] || "HKD";
                 currencySelect.value = destCurrency;
                 currencySelect.disabled = true;
+            }
+
+            // Update ledger header base currency label
+            const ledgerCurLabel = document.getElementById("ledger-currency-label");
+            if (ledgerCurLabel) {
+                const destSymbol = destCurrency === "MYR" ? "RM" : "¥";
+                ledgerCurLabel.textContent = `Base: ${destCurrency} (${destSymbol})`;
             }
 
             // Update IC currency symbol
@@ -3113,18 +3129,23 @@ if (typeof document !== 'undefined') {
                 return;
             }
 
-            // Filter expenses visible to current user:
-            // - global expenses are always shown
-            // - local expenses only shown to the 'paid by' person
-            // - settlement records always shown
-            const visibleExpenses = state.expenses.filter(exp => {
+            // Filter expenses visible to current user
+            let visibleExpenses = state.expenses.filter(exp => {
                 if (exp.isSettlement) return true;
                 if (exp.type === "local") return exp.payer === state.activeUser;
                 return true;
             });
 
+            // Filter by date if Show All is not active
+            if (!state.showAllExpenses && state.selectedExpenseDay) {
+                visibleExpenses = visibleExpenses.filter(exp => {
+                    const dayKey = exp.day || exp.date || "Unknown";
+                    return dayKey === state.selectedExpenseDay;
+                });
+            }
+
             if (visibleExpenses.length === 0) {
-                expensesList.innerHTML = `<div class="empty-state"><i data-lucide="receipt" class="empty-icon"></i><p>No expenses visible for you today.</p></div>`;
+                expensesList.innerHTML = `<div class="empty-state"><i data-lucide="receipt" class="empty-icon"></i><p>No expenses recorded for this date.</p></div>`;
                 if (window.lucide) lucide.createIcons();
                 return;
             }
@@ -3156,9 +3177,29 @@ if (typeof document !== 'undefined') {
                 byDay[dayKey].sort((a, b) => b.id.localeCompare(a.id)).forEach(exp => {
                     const item = document.createElement("div");
                     item.className = "expense-item";
-                    const origSymbol = exp.currency === "MYR" ? "RM" : (exp.currency === "HKD" ? "$" : "¥");
-                    const hkdVal = convertToHkd(exp.amount, exp.currency).toFixed(2);
-                    const localVal = exp.currency === destCurrency ? `${destSymbol}${exp.amount}` : `${origSymbol}${exp.amount}`;
+                    
+                    // Determine primary (destination currency) and secondary (HKD) values
+                    let primaryVal = "";
+                    let secondaryVal = "";
+                    
+                    const hkdAmount = convertToHkd(exp.amount, exp.currency);
+                    
+                    if (destCurrency === "JPY") {
+                        const jpyAmount = (hkdAmount / 0.05).toFixed(0);
+                        primaryVal = `¥${jpyAmount}`;
+                        secondaryVal = `HKD $${hkdAmount.toFixed(2)}`;
+                    } else if (destCurrency === "MYR") {
+                        const myrAmount = (hkdAmount / 2.0).toFixed(2);
+                        primaryVal = `RM ${myrAmount}`;
+                        secondaryVal = `HKD $${hkdAmount.toFixed(2)}`;
+                    } else if (destCurrency === "CNY") {
+                        const cnyAmount = (hkdAmount / 1.15).toFixed(2);
+                        primaryVal = `¥${cnyAmount}`;
+                        secondaryVal = `HKD $${hkdAmount.toFixed(2)}`;
+                    } else {
+                        primaryVal = `HKD $${hkdAmount.toFixed(2)}`;
+                        secondaryVal = "";
+                    }
 
                     // Type badge
                     const typeText = exp.type === "local" ? "👤 Local" : (exp.isSettlement ? "✅ Settled" : "🌍 Global");
@@ -3178,7 +3219,14 @@ if (typeof document !== 'undefined') {
                     // Split info for global
                     let splitBadge = "";
                     if (exp.type === "global" && !exp.isSettlement && exp.splitAmong) {
-                        splitBadge = `<span style="font-size:0.65rem; color:var(--text-secondary);">÷ ${exp.splitAmong.join(", ")}</span>`;
+                        const share = exp.amount / exp.splitAmong.length;
+                        let shareLabel = "";
+                        if (exp.currency === "JPY") shareLabel = `¥${share.toFixed(0)}`;
+                        else if (exp.currency === "MYR") shareLabel = `RM ${share.toFixed(2)}`;
+                        else if (exp.currency === "CNY") shareLabel = `¥${share.toFixed(2)}`;
+                        else shareLabel = `HKD $${share.toFixed(2)}`;
+
+                        splitBadge = `<span style="font-size:0.65rem; color:var(--text-secondary);">÷ ${exp.splitAmong.join(", ")} (${shareLabel} each)</span>`;
                     }
 
                     const displayTitle = exp.title || exp.category;
@@ -3193,13 +3241,18 @@ if (typeof document !== 'undefined') {
                                 ${splitBadge}
                             </div>
                         </div>
-                        <div class="expense-amount-side">
-                            <div class="expense-amount-hkd">${localVal}</div>
-                            <div class="expense-amount-orig" style="color:var(--text-secondary);">HKD $${hkdVal}</div>
+                        <div class="expense-amount-side" style="text-align:right;">
+                            <div class="expense-amount-hkd" style="font-weight:800; font-size:0.95rem;">${primaryVal}</div>
+                            <div class="expense-amount-orig" style="color:var(--text-secondary); font-size:0.72rem;">${secondaryVal}</div>
                         </div>
-                        <button class="action-icon-btn delete-action" style="width:24px; height:24px; margin-left:0.5rem;" onclick="deleteExpenseHandler('${exp.id}')">
-                            <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
-                        </button>
+                        <div style="display:flex; gap:0.25rem;">
+                            <button class="action-icon-btn edit-action" style="width:24px; height:24px; border-color:var(--accent); color:var(--accent);" onclick="openEditExpenseModal('${exp.id}')">
+                                <i data-lucide="edit-3" style="width:12px; height:12px;"></i>
+                            </button>
+                            <button class="action-icon-btn delete-action" style="width:24px; height:24px;" onclick="deleteExpenseHandler('${exp.id}')">
+                                <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
+                            </button>
+                        </div>
                     `;
                     expensesList.appendChild(item);
                 });
@@ -3216,6 +3269,124 @@ if (typeof document !== 'undefined') {
                 updateIcEstimator();
             }
         };
+
+        // Expense Editor Modal Helpers
+        window.openEditExpenseModal = function(id) {
+            const exp = state.expenses.find(e => e.id === id);
+            if (!exp) return;
+
+            document.getElementById("edit-expense-id").value = exp.id;
+            document.getElementById("edit-expense-title").value = exp.title || "";
+            document.getElementById("edit-expense-category").value = exp.category || "Other";
+            document.getElementById("edit-expense-type").value = exp.type || "global";
+            
+            // Adjust input value for per-person categories when loading
+            const isMeal = (exp.category || "").toLowerCase() === "food" || (exp.category || "").toLowerCase() === "drinks";
+            const numMembers = (exp.splitAmong && exp.splitAmong.length > 0) ? exp.splitAmong.length : 1;
+            let displayAmount = exp.amount;
+            if (exp.type === "global" && !isMeal) {
+                displayAmount = exp.amount / numMembers;
+            }
+            document.getElementById("edit-expense-amount").value = displayAmount;
+            document.getElementById("edit-expense-currency").value = exp.currency || "HKD";
+            
+            // Payer dropdown options
+            const members = state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice", "Bob", "Charlie"];
+            const payerSelect = document.getElementById("edit-expense-payer");
+            payerSelect.innerHTML = members.map(m =>
+                `<option value="${m}"${m === exp.payer ? " selected" : ""}>${m}</option>`
+            ).join("");
+
+            // Setup payment radio states
+            const pmType = exp.paymentMethod ? exp.paymentMethod.type : "cash";
+            const pmRadio = document.querySelector(`input[name="edit-pay-method"][value="${pmType}"]`);
+            if (pmRadio) pmRadio.checked = true;
+
+            const editSubs = document.getElementById("edit-epayment-subtypes");
+            if (pmType === "epayment") {
+                if (editSubs) editSubs.style.display = "flex";
+                const subType = (exp.paymentMethod && exp.paymentMethod.subType) ? exp.paymentMethod.subType : "alipayhk";
+                const subRadio = document.querySelector(`input[name="edit-epay-sub"][value="${subType}"]`);
+                if (subRadio) subRadio.checked = true;
+            } else {
+                if (editSubs) editSubs.style.display = "none";
+            }
+
+            // Render Split Configuration Panel
+            renderEditSplitPanel(members, exp.splitAmong, exp.splitRatios);
+            const splitPanel = document.getElementById("edit-split-config-panel");
+            if (splitPanel) {
+                splitPanel.style.display = exp.type === "global" ? "block" : "none";
+            }
+
+            document.getElementById("edit-expense-modal").classList.add("open");
+            if (window.lucide) window.lucide.createIcons();
+        };
+
+        function renderEditSplitPanel(members, selectedMembers = [], selectedRatios = {}) {
+            const list = document.getElementById("edit-split-members-list");
+            if (!list) return;
+
+            const activeMembers = selectedMembers && selectedMembers.length > 0 ? selectedMembers : members;
+
+            list.innerHTML = members.map(m => {
+                const checked = activeMembers.includes(m);
+                const pct = selectedRatios && selectedRatios[m] !== undefined ? selectedRatios[m] : (checked ? Math.floor(100 / activeMembers.length) : 0);
+                
+                return `
+                    <div class="split-member-row" data-member="${m}" style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; font-size:0.8rem; padding:0.25rem 0;">
+                        <label style="display:flex; align-items:center; gap:0.25rem; font-weight:600;">
+                            <input type="checkbox" class="edit-split-checkbox" ${checked ? "checked" : ""}>
+                            ${m}
+                        </label>
+                        <div style="display:flex; align-items:center; gap:0.4rem; flex-grow:1; justify-content:flex-end;">
+                            <input type="range" class="edit-split-slider" min="0" max="100" value="${pct}" style="width:70px;" ${!checked ? "disabled" : ""}>
+                            <span class="edit-split-pct-label" style="min-width:30px; text-align:right; font-weight:700;">${pct}%</span>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+
+            list.querySelectorAll(".split-member-row").forEach(row => {
+                const cb = row.querySelector(".edit-split-checkbox");
+                const slider = row.querySelector(".edit-split-slider");
+                const label = row.querySelector(".edit-split-pct-label");
+
+                cb.addEventListener("change", () => {
+                    slider.disabled = !cb.checked;
+                    if (!cb.checked) {
+                        slider.value = 0;
+                        label.textContent = "0%";
+                    }
+                    autoSplitEditChecked();
+                });
+
+                slider.addEventListener("input", () => {
+                    label.textContent = `${slider.value}%`;
+                });
+            });
+        }
+
+        function autoSplitEditChecked() {
+            const list = document.getElementById("edit-split-members-list");
+            if (!list) return;
+            const checkedRows = [];
+            list.querySelectorAll(".split-member-row").forEach(row => {
+                const cb = row.querySelector(".edit-split-checkbox");
+                if (cb && cb.checked) checkedRows.push(row);
+            });
+            const n = checkedRows.length;
+            if (n === 0) return;
+            const base = Math.floor(100 / n);
+            const remainder = 100 % n;
+            checkedRows.forEach((row, idx) => {
+                const slider = row.querySelector(".edit-split-slider");
+                const label = row.querySelector(".edit-split-pct-label");
+                const val = idx < remainder ? base + 1 : base;
+                slider.value = val;
+                label.textContent = `${val}%`;
+            });
+        }
 
         // Render Settle up details inside custom neobrutalist table
         function renderDebtSettlement() {
@@ -3965,6 +4136,134 @@ if (typeof document !== 'undefined') {
 
         // Wallet V2 initial renders
         renderDaySelector();
+        // Ledger Show All toggle event
+        const showAllBtn = document.getElementById("ledger-show-all-btn");
+        if (showAllBtn) {
+            showAllBtn.addEventListener("click", () => {
+                state.showAllExpenses = !state.showAllExpenses;
+                if (state.showAllExpenses) {
+                    showAllBtn.textContent = "Filter Date";
+                    showAllBtn.classList.remove("btn-secondary");
+                    showAllBtn.classList.add("btn-accent");
+                } else {
+                    showAllBtn.textContent = "Show All";
+                    showAllBtn.classList.remove("btn-accent");
+                    showAllBtn.classList.add("btn-secondary");
+                }
+                renderLedger();
+            });
+        }
+
+        // Edit Expense Modal Event Bindings
+        const closeEditExpenseModalBtn = document.getElementById("close-edit-expense-modal");
+        const cancelEditExpenseBtn = document.getElementById("cancel-edit-expense-btn");
+        const editExpenseModal = document.getElementById("edit-expense-modal");
+        const editExpenseForm = document.getElementById("edit-expense-form");
+
+        function closeEditModal() {
+            if (editExpenseModal) editExpenseModal.classList.remove("open");
+        }
+        if (closeEditExpenseModalBtn) closeEditExpenseModalBtn.addEventListener("click", closeEditModal);
+        if (cancelEditExpenseBtn) cancelEditExpenseBtn.addEventListener("click", closeEditModal);
+
+        document.querySelectorAll('input[name="edit-pay-method"]').forEach(radio => {
+            radio.addEventListener("change", () => {
+                const val = radio.value;
+                const eSubs = document.getElementById("edit-epayment-subtypes");
+                if (eSubs) eSubs.style.display = val === "epayment" ? "flex" : "none";
+            });
+        });
+
+        const editSplitAllBtn = document.getElementById("edit-split-all-btn");
+        if (editSplitAllBtn) {
+            editSplitAllBtn.addEventListener("click", () => {
+                const checkboxes = document.querySelectorAll(".edit-split-checkbox");
+                checkboxes.forEach(cb => {
+                    cb.checked = true;
+                    const row = cb.closest(".split-member-row");
+                    const slider = row.querySelector(".edit-split-slider");
+                    if (slider) slider.disabled = false;
+                });
+                autoSplitEditChecked();
+            });
+        }
+
+        if (editExpenseForm) {
+            editExpenseForm.addEventListener("submit", (e) => {
+                e.preventDefault();
+                const id = document.getElementById("edit-expense-id").value;
+                const index = state.expenses.findIndex(exp => exp.id === id);
+                if (index === -1) return;
+
+                const title = document.getElementById("edit-expense-title").value.trim();
+                const category = document.getElementById("edit-expense-category").value;
+                const type = document.getElementById("edit-expense-type").value;
+                const amountInputVal = Number(document.getElementById("edit-expense-amount").value);
+                const payer = document.getElementById("edit-expense-payer").value;
+                
+                // Get payment method
+                const payMethodRadio = document.querySelector('input[name="edit-pay-method"]:checked');
+                const payMethod = payMethodRadio ? payMethodRadio.value : "cash";
+                let subType = null;
+                if (payMethod === "epayment") {
+                    const subRadio = document.querySelector('input[name="edit-epay-sub"]:checked');
+                    subType = subRadio ? subRadio.value : "alipayhk";
+                }
+
+                // Read split list
+                const splitAmong = [];
+                const splitRatios = {};
+                let totalPct = 0;
+                
+                if (type === "global") {
+                    const list = document.getElementById("edit-split-members-list");
+                    list.querySelectorAll(".split-member-row").forEach(row => {
+                        const m = row.dataset.member;
+                        const cb = row.querySelector(".edit-split-checkbox");
+                        const slider = row.querySelector(".edit-split-slider");
+                        if (cb && cb.checked) {
+                            const pct = parseInt(slider.value, 10);
+                            splitAmong.push(m);
+                            splitRatios[m] = pct;
+                            totalPct += pct;
+                        }
+                    });
+                    if (totalPct !== 100) {
+                        alert("⚠️ Split percentages must sum to exactly 100%!");
+                        return;
+                    }
+                }
+
+                const isMeal = category.toLowerCase() === "food" || category.toLowerCase() === "drinks";
+                let finalAmount = amountInputVal;
+                if (type === "global" && !isMeal && splitAmong.length > 0) {
+                    finalAmount = amountInputVal * splitAmong.length;
+                }
+
+                // Update expense in state
+                state.expenses[index].title = title || category;
+                state.expenses[index].category = category;
+                state.expenses[index].type = type;
+                state.expenses[index].amount = finalAmount;
+                state.expenses[index].payer = payer;
+                state.expenses[index].paymentMethod = { type: payMethod, subType };
+                
+                if (type === "global") {
+                    state.expenses[index].splitAmong = splitAmong;
+                    state.expenses[index].splitRatios = splitRatios;
+                } else {
+                    delete state.expenses[index].splitAmong;
+                    delete state.expenses[index].splitRatios;
+                }
+
+                saveExpensesToStorage();
+                renderLedger();
+                renderDebtSettlement();
+                updateIcEstimator();
+                closeEditModal();
+            });
+        }
+        
         renderSplitPanel(state.groupMembers && state.groupMembers.length > 0 ? state.groupMembers : ["Alice","Bob","Charlie"]);
         renderCashTracker();
         updateExpenseTypePanels("global"); // default to global, show split panel
