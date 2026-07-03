@@ -130,19 +130,26 @@ class Container {
     // Get initial size from DOM
     this.updateSizeFromDOM()
 
-    // Handle page snapshot
-    if (Container.pageSnapshot) {
-      // Snapshot already exists, initialize immediately
-      this.initWebGL()
-    } else if (Container.isCapturing) {
-      // Snapshot in progress, add to waiting queue
-      Container.waitingForSnapshot.push(this)
-    } else {
-      // Start snapshot process
-      Container.isCapturing = true
-      Container.waitingForSnapshot.push(this)
-      this.capturePageSnapshot()
+    // Bypassing html2canvas: Create a premium fluid gradient texture directly!
+    if (!Container.pageSnapshot) {
+      const fallbackCanvas = document.createElement('canvas')
+      fallbackCanvas.width = 512
+      fallbackCanvas.height = 512
+      const ctx = fallbackCanvas.getContext('2d')
+      
+      // Draw a multi-color radial gradient to simulate fluid backdrop for glass refraction
+      const grad = ctx.createRadialGradient(256, 256, 40, 256, 256, 320)
+      grad.addColorStop(0, '#6366f1') // Indigo
+      grad.addColorStop(0.3, '#3b82f6') // Trust Blue
+      grad.addColorStop(0.6, '#a855f7') // Purple
+      grad.addColorStop(1, '#070b19') // Midnight Blue
+      ctx.fillStyle = grad
+      ctx.fillRect(0, 0, 512, 512)
+      
+      Container.pageSnapshot = fallbackCanvas
     }
+    
+    this.initWebGL()
   }
 
   createElement() {
