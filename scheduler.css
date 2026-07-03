@@ -266,7 +266,9 @@ body {
 }
 
 .card:hover {
-    box-shadow: var(--shadow-md);
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 12px 40px rgba(234, 179, 8, 0.12);
+    border-color: var(--accent);
 }
 
 .card-header {
@@ -646,23 +648,29 @@ label {
 
 input[type="text"],
 input[type="time"],
-select {
+input[type="number"],
+select,
+textarea {
     font-family: var(--font-primary);
-    background-color: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 0.6rem 0.8rem;
+    background-color: var(--bg-card-glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    padding: 0.65rem 0.9rem;
     color: var(--text-primary);
     font-size: 0.9rem;
     outline: none;
     transition: var(--transition);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 input[type="text"]:focus,
 input[type="time"]:focus,
-select:focus {
+input[type="number"]:focus,
+select:focus,
+textarea:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent-light);
+    box-shadow: 0 0 12px rgba(234, 179, 8, 0.25);
 }
 
 .checkbox-group {
@@ -776,16 +784,22 @@ select:focus {
 /* Bottom Navigation */
 .bottom-nav {
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background-color: var(--bg-header);
-    border-top: 1px solid var(--border);
+    bottom: 1.25rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 2.5rem);
+    max-width: 500px;
+    background-color: var(--bg-card-glass);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    padding: 0.5rem 0;
+    padding: 0.65rem 0.5rem;
     z-index: 100;
-    box-shadow: 0 -4px 10px rgba(0,0,0,0.03);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    border-radius: 50px;
+    transition: var(--transition);
 }
 
 .nav-item {
@@ -801,20 +815,45 @@ select:focus {
     font-size: 0.75rem;
     font-weight: 500;
     transition: var(--transition);
+    position: relative;
+    border-radius: 30px;
+    padding: 0.25rem 0;
 }
 
 .nav-item i {
     width: 20px;
     height: 20px;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .nav-item:hover {
     color: var(--accent);
 }
 
+.nav-item:hover i {
+    transform: translateY(-2px);
+}
+
 .nav-item.active {
     color: var(--accent);
     font-weight: 700;
+}
+
+.nav-item.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    width: 12px;
+    height: 4px;
+    background-color: var(--accent);
+    border-radius: 2px;
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulseGlow 1.5s infinite ease-in-out;
+}
+
+@keyframes pulseGlow {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.2); }
 }
 
 /* Placeholder card styles */
