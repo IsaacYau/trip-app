@@ -2360,9 +2360,26 @@ textarea:focus {
     gap: 0.4rem;
     overflow-x: auto;
     padding: 0.5rem 0 0.75rem 0;
-    scrollbar-width: thin;
+    scrollbar-width: auto;
     scrollbar-color: var(--border) transparent;
     margin-bottom: 0.25rem;
+}
+
+.day-selector-strip::-webkit-scrollbar {
+    height: 6px;
+}
+
+.day-selector-strip::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.day-selector-strip::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 10px;
+}
+
+.day-selector-strip::-webkit-scrollbar-thumb:hover {
+    background-color: var(--accent);
 }
 
 .day-pill {
@@ -2377,6 +2394,8 @@ textarea:focus {
     cursor: pointer;
     transition: var(--transition);
     white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
 }
 
 .day-pill:hover {
@@ -2384,11 +2403,30 @@ textarea:focus {
     color: var(--accent);
 }
 
+.day-pill.has-spending {
+    border-color: rgba(234, 179, 8, 0.5);
+    box-shadow: 0 0 5px rgba(234, 179, 8, 0.15);
+}
+
+.day-pill.has-spending::after {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background-color: var(--accent);
+    border-radius: 50%;
+    margin-left: 0.3rem;
+}
+
 .day-pill.active {
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
     font-weight: 700;
+}
+
+.day-pill.active.has-spending::after {
+    background-color: #fff;
 }
 
 .day-pill.today:not(.active) {

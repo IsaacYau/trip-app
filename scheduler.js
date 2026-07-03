@@ -34,6 +34,17 @@ const FX_RATES = {
     MYR: 2.0
 };
 
+function safeParseDate(dateStr) {
+    if (!dateStr) return new Date();
+    // If YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return new Date(dateStr + "T12:00:00");
+    }
+    // Direct parse
+    const parsed = Date.parse(dateStr);
+    return isNaN(parsed) ? new Date() : new Date(parsed);
+}
+
 function timeToMinutes(timeStr) {
     if (!timeStr) return 0;
     const [h, m] = timeStr.split(":").map(Number);
@@ -959,24 +970,55 @@ if (typeof document !== 'undefined') {
             // Gather all dates from recorded expenses
             const expDates = state.expenses.map(e => e.day || e.date).filter(Boolean);
             
-            // Build a default range around today
-            const defaultDays = [];
-            for (let i = -5; i <= 2; i++) {
-                const d = new Date(today);
-                d.setDate(d.getDate() + i);
-                defaultDays.push(d.toISOString().split("T")[0]);
-            }
+            // Collect days with active spending (ignoring settlements)
+            const spendingDates = new Set();
+            state.expenses.forEach(e => {
+                if (!e.isSettlement && e.amount > 0) {
+                    spendingDates.add(e.day || e.date);
+                }
+            });
 
-            // Merge unique dates and sort chronologically
-            const allDaysSet = new Set([...defaultDays, ...expDates]);
-            const days = Array.from(allDaysSet).sort();
+            // Find the earliest date in recorded expenses
+            let startDate = new Date(today);
+            startDate.setDate(startDate.getDate() - 5); // default window start
+
+            expDates.forEach(dStr => {
+                const parsed = safeParseDate(dStr);
+                if (parsed < startDate) {
+                    startDate = parsed;
+                }
+            });
+
+            // Build chronological day array from earliest date to today + 2 days
+            const days = [];
+            const endDate = new Date(today);
+            endDate.setDate(endDate.getDate() + 2); // end window
+
+            let current = new Date(startDate);
+            while (current <= endDate) {
+                days.push(current.toISOString().split("T")[0]);
+                current.setDate(current.getDate() + 1);
+            }
 
             strip.innerHTML = days.map(iso => {
                 const isToday = iso === today;
                 const isSelected = iso === state.selectedExpenseDay;
-                const dateObj = new Date(iso + "T12:00:00");
-                const label = isToday ? "Today" : dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                return `<button type="button" class="day-pill${isSelected ? " active" : ""}${isToday ? " today" : ""}" data-day="${iso}">${label}</button>`;
+                const dateObj = safeParseDate(iso);
+                
+                let label = "";
+                if (isToday) {
+                    label = "Today";
+                } else if (isNaN(dateObj.getTime())) {
+                    label = iso;
+                } else {
+                    label = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                }
+
+                // Check if this date has spending
+                const hasSpending = spendingDates.has(iso);
+                const hasSpendingClass = hasSpending ? " has-spending" : "";
+
+                return `<button type="button" class="day-pill${isSelected ? " active" : ""}${isToday ? " today" : ""}${hasSpendingClass}" data-day="${iso}">${label}</button>`;
             }).join("");
 
             strip.querySelectorAll(".day-pill").forEach(btn => {
@@ -3328,19 +3370,24 @@ if (typeof document !== 'undefined') {
             if (!list) return;
 
             const activeMembers = selectedMembers && selectedMembers.length > 0 ? selectedMembers : members;
+            const totalAmount = Number(document.getElementById("edit-expense-amount").value) || 0;
+            const destCurrency = state.destination === "japan" ? "JPY" : state.destination === "malaysia" ? "MYR" : "CNY";
 
             list.innerHTML = members.map(m => {
                 const checked = activeMembers.includes(m);
                 const pct = selectedRatios && selectedRatios[m] !== undefined ? selectedRatios[m] : (checked ? Math.floor(100 / activeMembers.length) : 0);
+                const amt = totalAmount * (pct / 100);
                 
                 return `
-                    <div class="split-member-row" data-member="${m}" style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; font-size:0.8rem; padding:0.25rem 0;">
-                        <label style="display:flex; align-items:center; gap:0.25rem; font-weight:600;">
+                    <div class="split-member-row" data-member="${m}" style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; font-size:0.8rem; padding:0.25rem 0; flex-wrap:wrap;">
+                        <label style="display:flex; align-items:center; gap:0.25rem; font-weight:600; min-width:80px;">
                             <input type="checkbox" class="edit-split-checkbox" ${checked ? "checked" : ""}>
                             ${m}
                         </label>
                         <div style="display:flex; align-items:center; gap:0.4rem; flex-grow:1; justify-content:flex-end;">
-                            <input type="range" class="edit-split-slider" min="0" max="100" value="${pct}" style="width:70px;" ${!checked ? "disabled" : ""}>
+                            <input type="number" class="edit-split-amt-input" step="0.01" min="0" value="${amt.toFixed(2)}" style="width:65px; padding:0.15rem 0.3rem; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:0.75rem;" ${!checked ? "disabled" : ""}>
+                            <span style="font-size:0.7rem; color:var(--text-secondary);">${destCurrency}</span>
+                            <input type="range" class="edit-split-slider" min="0" max="100" value="${pct}" style="width:60px;" ${!checked ? "disabled" : ""}>
                             <span class="edit-split-pct-label" style="min-width:30px; text-align:right; font-weight:700;">${pct}%</span>
                         </div>
                     </div>
@@ -3350,19 +3397,44 @@ if (typeof document !== 'undefined') {
             list.querySelectorAll(".split-member-row").forEach(row => {
                 const cb = row.querySelector(".edit-split-checkbox");
                 const slider = row.querySelector(".edit-split-slider");
-                const label = row.querySelector(".edit-split-pct-label");
+                const pctLabel = row.querySelector(".edit-split-pct-label");
+                const amtInput = row.querySelector(".edit-split-amt-input");
+
+                const syncAmtFromPct = () => {
+                    const currentTotal = Number(document.getElementById("edit-expense-amount").value) || 0;
+                    const pct = parseInt(slider.value, 10);
+                    const computed = currentTotal * (pct / 100);
+                    amtInput.value = computed.toFixed(2);
+                };
+
+                const syncPctFromAmt = () => {
+                    const currentTotal = Number(document.getElementById("edit-expense-amount").value) || 0;
+                    const amt = Number(amtInput.value) || 0;
+                    if (currentTotal > 0) {
+                        const pct = Math.round((amt / currentTotal) * 100);
+                        slider.value = pct;
+                        pctLabel.textContent = `${pct}%`;
+                    }
+                };
 
                 cb.addEventListener("change", () => {
                     slider.disabled = !cb.checked;
+                    amtInput.disabled = !cb.checked;
                     if (!cb.checked) {
                         slider.value = 0;
-                        label.textContent = "0%";
+                        pctLabel.textContent = "0%";
+                        amtInput.value = "0.00";
                     }
                     autoSplitEditChecked();
                 });
 
                 slider.addEventListener("input", () => {
-                    label.textContent = `${slider.value}%`;
+                    pctLabel.textContent = `${slider.value}%`;
+                    syncAmtFromPct();
+                });
+
+                amtInput.addEventListener("input", () => {
+                    syncPctFromAmt();
                 });
             });
         }
@@ -3379,12 +3451,17 @@ if (typeof document !== 'undefined') {
             if (n === 0) return;
             const base = Math.floor(100 / n);
             const remainder = 100 % n;
+            const total = Number(document.getElementById("edit-expense-amount").value) || 0;
+
             checkedRows.forEach((row, idx) => {
                 const slider = row.querySelector(".edit-split-slider");
-                const label = row.querySelector(".edit-split-pct-label");
+                const pctLabel = row.querySelector(".edit-split-pct-label");
+                const amtInput = row.querySelector(".edit-split-amt-input");
                 const val = idx < remainder ? base + 1 : base;
+                
                 slider.value = val;
-                label.textContent = `${val}%`;
+                pctLabel.textContent = `${val}%`;
+                amtInput.value = (total * (val / 100)).toFixed(2);
             });
         }
 
@@ -4185,6 +4262,25 @@ if (typeof document !== 'undefined') {
                     if (slider) slider.disabled = false;
                 });
                 autoSplitEditChecked();
+            });
+        }
+
+        const editAmountEl = document.getElementById("edit-expense-amount");
+        if (editAmountEl) {
+            editAmountEl.addEventListener("input", () => {
+                const list = document.getElementById("edit-split-members-list");
+                if (list) {
+                    const total = Number(editAmountEl.value) || 0;
+                    list.querySelectorAll(".split-member-row").forEach(row => {
+                        const cb = row.querySelector(".edit-split-checkbox");
+                        if (cb && cb.checked) {
+                            const slider = row.querySelector(".edit-split-slider");
+                            const amtInput = row.querySelector(".edit-split-amt-input");
+                            const pct = parseInt(slider.value, 10);
+                            amtInput.value = (total * (pct / 100)).toFixed(2);
+                        }
+                    });
+                }
             });
         }
 
