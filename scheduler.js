@@ -785,6 +785,13 @@ if (typeof document !== 'undefined') {
                 }
             }
 
+            // Normalize all expense dates on load
+            state.expenses.forEach(exp => {
+                const normalized = normalizeToIsoDate(exp.day || exp.date);
+                exp.day = normalized;
+                exp.date = normalized;
+            });
+
             // Load partitioned IC cards
             const icKey = state.activeGroupId === "TRIP-2026" ? "travelICCards" : `travelICCards_${state.activeGroupId}`;
             const storedIC = localStorage.getItem(icKey);
@@ -974,6 +981,7 @@ if (typeof document !== 'undefined') {
         function renderDaySelector() {
             const picker = document.getElementById("ledger-date-picker");
             const indicator = document.getElementById("ledger-date-spending-indicator");
+            const spendingListContainer = document.getElementById("ledger-active-spending-days");
             if (!picker) return;
             
             const today = getTodayTripDay();
@@ -995,6 +1003,35 @@ if (typeof document !== 'undefined') {
             const currentSelectedNorm = normalizeToIsoDate(state.selectedExpenseDay);
             if (indicator) {
                 indicator.style.display = spendingDates.has(currentSelectedNorm) ? "inline-flex" : "none";
+            }
+
+            // Populate clickable active spending days quick selection pills
+            if (spendingListContainer) {
+                if (spendingDates.size === 0) {
+                    spendingListContainer.innerHTML = `<span style="font-size:0.65rem; color:var(--text-secondary);">No spending days recorded yet.</span>`;
+                } else {
+                    const sortedDays = Array.from(spendingDates).sort();
+                    spendingListContainer.innerHTML = `
+                        <span style="font-weight:750; margin-right:0.25rem;">Active Days:</span>
+                        ${sortedDays.map(iso => {
+                            const isSelected = iso === currentSelectedNorm;
+                            const dateObj = safeParseDate(iso);
+                            const label = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                            const badgeStyle = isSelected 
+                                ? "background:var(--accent); color:#fff; border-color:var(--accent); border:1px solid var(--accent);" 
+                                : "background:var(--bg-card-glass); border:1px solid var(--border); color:var(--text-primary); cursor:pointer;";
+                            return `<span class="activity-badge active-day-badge" data-day="${iso}" style="padding:2px 6px; font-size:0.65rem; font-weight:700; border-radius:3px; transition:var(--transition); ${badgeStyle}">${label}</span>`;
+                        }).join("")}
+                    `;
+
+                    spendingListContainer.querySelectorAll(".active-day-badge").forEach(badge => {
+                        badge.addEventListener("click", () => {
+                            state.selectedExpenseDay = badge.dataset.day;
+                            renderDaySelector();
+                            renderLedger();
+                        });
+                    });
+                }
             }
         }
 
@@ -1296,6 +1333,20 @@ if (typeof document !== 'undefined') {
                 const totalPaidDirect = cashPaid + epayPaid + transitPaid;
                 const theoreticalTotal = localTotal + globalShareTotal;
 
+                // Cash balance spent and remaining computation
+                const initialCash = (state.cashBalances[m] && state.cashBalances[m].initial) || 0;
+                let cashSpentLocal = 0;
+                state.expenses.forEach(exp => {
+                    if (exp.paymentMethod && exp.paymentMethod.type === "cash" && !exp.isSettlement) {
+                        if (exp.payer === m) {
+                            const expAmtLocal = exp.currency === currency ? exp.amount : (convertToHkd(exp.amount, exp.currency) / rate);
+                            cashSpentLocal += expAmtLocal;
+                        }
+                    }
+                });
+                const remainingCashLocal = initialCash - cashSpentLocal;
+                const isNegCash = remainingCashLocal < 0;
+
                 return `
                 <div class="spending-member-card" style="flex:1; min-width:200px; padding:0.5rem; background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:0.75rem;">
                     <div style="font-weight:700; color:var(--text-primary); border-bottom:1px solid var(--border); padding-bottom:0.25rem; margin-bottom:0.4rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.2rem;">
@@ -1318,6 +1369,11 @@ if (typeof document !== 'undefined') {
                         <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--border); padding-top:0.2rem; margin-top:0.25rem; font-weight:700; flex-wrap:wrap; gap:0.2rem;">
                             <span>💰 Total directly paid:</span>
                             <span style="color:var(--text-primary);">${formatAmount(totalPaidDirect)}</span>
+                        </div>
+                        <!-- Cash spent & remaining breakdown -->
+                        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.2rem; font-size:0.68rem; margin-top:0.3rem; border-top:1px solid rgba(255,255,255,0.06); padding-top:0.3rem; color:var(--text-secondary);">
+                            <span>Initial Cash: ${symbol}${initialCash.toLocaleString()}</span>
+                            <span class="${isNegCash ? 'cash-negative' : 'cash-positive'}">Rem: ${symbol}${remainingCashLocal.toLocaleString()}</span>
                         </div>
                     </div>
                 </div>`;
@@ -2545,6 +2601,13 @@ if (typeof document !== 'undefined') {
             const icPassengerSelectEl = document.getElementById("ic-passenger");
             if (icPassengerSelectEl) {
                 icPassengerSelectEl.innerHTML = members.map(m =>
+                    `<option value="${m}"${m === state.activeUser ? " selected" : ""}>${m}</option>`
+                ).join("");
+            }
+
+            const cashMemberSelectEl = document.getElementById("cash-member-select");
+            if (cashMemberSelectEl) {
+                cashMemberSelectEl.innerHTML = members.map(m =>
                     `<option value="${m}"${m === state.activeUser ? " selected" : ""}>${m}</option>`
                 ).join("");
             }
@@ -4159,6 +4222,26 @@ if (typeof document !== 'undefined') {
                 state.activeGroupId = selectedVal;
                 localStorage.setItem("travelActiveGroupId", selectedVal);
                 switchTripNetwork(selectedVal);
+            });
+        }
+
+        // Bind Cash Initial Balance Set Button
+        const cashSetBtn = document.getElementById("cash-set-initial-btn");
+        if (cashSetBtn) {
+            cashSetBtn.addEventListener("click", () => {
+                const member = document.getElementById("cash-member-select").value;
+                const amtInput = document.getElementById("cash-initial-amount");
+                const initialVal = parseFloat(amtInput.value) || 0;
+                
+                const currency = state.destination === "japan" ? "JPY" : state.destination === "malaysia" ? "MYR" : "CNY";
+                if (!state.cashBalances[member]) state.cashBalances[member] = { initial: 0, currency };
+                
+                state.cashBalances[member].initial = initialVal;
+                state.cashBalances[member].currency = currency;
+                
+                saveCashBalancesToStorage();
+                renderCashTracker();
+                amtInput.value = "";
             });
         }
 

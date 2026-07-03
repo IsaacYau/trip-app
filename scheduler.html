@@ -251,11 +251,20 @@
 
             <!-- Cash Balance Tracker Card (full-width, top of wallet grid) -->
             <div class="card cash-tracker-card">
-                <div class="card-header">
-                    <h3 class="card-title"><i data-lucide="banknote"></i> Cash Balance Tracker</h3>
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                    <h3 class="card-title" style="margin:0;"><i data-lucide="banknote"></i> Cash Balance Tracker</h3>
                     <span class="wallet-currency-badge" id="cash-tracker-currency-badge">JPY</span>
                 </div>
                 <p style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.75rem;">Track each member's cash spending. Set initial cash in local currency — deducted when you mark an expense as "Cash".</p>
+                
+                <!-- Set Initial Balance Controls -->
+                <div class="cash-set-initial-row" style="display:flex; align-items:center; gap:0.5rem; background:rgba(255,255,255,0.02); padding:0.5rem; border-radius:var(--radius-sm); border:1px solid var(--border); margin-bottom:0.75rem; flex-wrap:wrap;">
+                    <label for="cash-member-select" style="font-size:0.72rem; font-weight:750; color:var(--text-secondary);">Set Balance:</label>
+                    <select id="cash-member-select" style="padding:0.25rem; font-size:0.75rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); outline:none; font-family:var(--font-primary);"></select>
+                    <input type="number" id="cash-initial-amount" placeholder="e.g. 50000" min="0" step="1000" style="padding:0.25rem; font-size:0.75rem; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-card); color:var(--text-primary); width:80px; outline:none; font-family:var(--font-primary);">
+                    <button type="button" id="cash-set-initial-btn" class="btn btn-sm btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.7rem; font-weight:700;">Set</button>
+                </div>
+
                 <div id="cash-tracker-list" class="cash-tracker-list">
                     <!-- Populated by JS -->
                 </div>
@@ -281,12 +290,18 @@
                     </div>
 
                     <!-- Date Picker Filter -->
-                    <div class="ledger-filter-row" style="display:flex; align-items:center; gap:0.5rem; margin: 0.5rem 0 1rem 0; background:rgba(255,255,255,0.02); padding:0.5rem 0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border); flex-wrap:wrap;">
-                        <label for="ledger-date-picker" style="font-size:0.75rem; font-weight:750; color:var(--text-secondary);">Filter Date:</label>
-                        <input type="date" id="ledger-date-picker" style="padding:0.35rem 0.55rem; font-size:0.8rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-card-glass); color:var(--text-primary); outline:none; font-family:var(--font-primary);">
-                        <span id="ledger-date-spending-indicator" style="font-size:0.7rem; font-weight:800; color:var(--accent); display:none; align-items:center; gap:0.25rem;">
-                            <span style="display:inline-block; width:6px; height:6px; background-color:var(--accent); border-radius:50%;"></span> Has Spending
-                        </span>
+                    <div class="ledger-filter-row" style="display:flex; flex-direction:column; gap:0.4rem; margin: 0.5rem 0 1rem 0; background:rgba(255,255,255,0.02); padding:0.5rem 0.75rem; border-radius:var(--radius-sm); border:1px solid var(--border);">
+                        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; width:100%;">
+                            <label for="ledger-date-picker" style="font-size:0.75rem; font-weight:750; color:var(--text-secondary);">Filter Date:</label>
+                            <input type="date" id="ledger-date-picker" style="padding:0.35rem 0.55rem; font-size:0.8rem; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-card-glass); color:var(--text-primary); outline:none; font-family:var(--font-primary);">
+                            <span id="ledger-date-spending-indicator" style="font-size:0.7rem; font-weight:800; color:var(--accent); display:none; align-items:center; gap:0.25rem;">
+                                <span style="display:inline-block; width:6px; height:6px; background-color:var(--accent); border-radius:50%;"></span> Has Spending
+                            </span>
+                        </div>
+                        <!-- Active spending days quick list -->
+                        <div id="ledger-active-spending-days" style="display:flex; gap:0.25rem; align-items:center; flex-wrap:wrap; margin-top:0.15rem; font-size:0.7rem; color:var(--text-secondary);">
+                            <!-- Clickable spending days -->
+                        </div>
                     </div>
 
                     <!-- Add Expense Form -->
