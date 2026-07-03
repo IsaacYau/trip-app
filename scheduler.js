@@ -3766,6 +3766,9 @@ if (typeof document !== 'undefined') {
                     if (!state.icCards[passenger]) state.icCards[passenger] = { JPY: 0, MYR: 0, CNY: 0, logs: [] };
                     state.icCards[passenger][currency] += act.val;
                     
+                    const pmRadio = document.querySelector('input[name="ic-recharge-pm"]:checked');
+                    const payMethod = pmRadio ? pmRadio.value : "cash";
+
                     // Add recharge to ledger as personal/local expense
                     const exp = {
                         id: `exp-${Date.now()}`,
@@ -3775,7 +3778,7 @@ if (typeof document !== 'undefined') {
                         payer: passenger,
                         category: "Transport",
                         type: "local",
-                        paymentMethod: { type: "transit", subType: null },
+                        paymentMethod: { type: payMethod, subType: null },
                         day: getTodayTripDay(),
                         date: new Date().toLocaleDateString()
                     };
@@ -3786,6 +3789,7 @@ if (typeof document !== 'undefined') {
                     updateIcEstimator();
                     renderLedger();
                     renderDebtSettlement();
+                    renderCashTracker();
                     showToast("✅ IC Top-up", `${passenger}'s card recharged by ${act.label}`);
                 });
                 icRechargeRow.appendChild(btn);
@@ -3822,6 +3826,9 @@ if (typeof document !== 'undefined') {
                 if (!state.icCards[passenger]) state.icCards[passenger] = { JPY: 0, MYR: 0, CNY: 0, logs: [] };
                 state.icCards[passenger][currency] += val;
 
+                const pmRadio = document.querySelector('input[name="ic-recharge-pm"]:checked');
+                const payMethod = pmRadio ? pmRadio.value : "cash";
+
                 // Log as local expense
                 const exp = {
                     id: `exp-${Date.now()}`,
@@ -3831,7 +3838,7 @@ if (typeof document !== 'undefined') {
                     payer: passenger,
                     category: "Transport",
                     type: "local",
-                    paymentMethod: { type: "transit", subType: null },
+                    paymentMethod: { type: payMethod, subType: null },
                     day: getTodayTripDay(),
                     date: new Date().toLocaleDateString()
                 };
@@ -3842,6 +3849,7 @@ if (typeof document !== 'undefined') {
                 updateIcEstimator();
                 renderLedger();
                 renderDebtSettlement();
+                renderCashTracker();
                 const sym = currency === "MYR" ? "RM" : "¥";
                 showToast("✅ IC Top-up", `${passenger}'s card recharged by ${sym}${val}`);
                 icCustomAmountInput.value = "";

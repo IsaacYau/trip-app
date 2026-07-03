@@ -516,6 +516,18 @@
                     <!-- Card Actions -->
                     <div class="ic-actions">
                         <div class="ic-recharge-title">Recharge Simulator (Local Currency)</div>
+                        
+                        <!-- Recharge Paid Via method select -->
+                        <div class="ic-recharge-method-row" style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; font-size:0.72rem;">
+                            <span style="font-weight:750; color:var(--text-secondary);">Paid Via:</span>
+                            <label style="display:inline-flex; align-items:center; gap:0.2rem; cursor:pointer; font-weight:600; color:var(--text-primary);">
+                                <input type="radio" name="ic-recharge-pm" value="cash" checked style="margin:0;"> Cash
+                            </label>
+                            <label style="display:inline-flex; align-items:center; gap:0.2rem; cursor:pointer; font-weight:600; color:var(--text-primary); margin-left:0.5rem;">
+                                <input type="radio" name="ic-recharge-pm" value="epayment" style="margin:0;"> ePayment
+                            </label>
+                        </div>
+
                         <div class="recharge-buttons" id="ic-recharge-row">
                             <!-- Populated by JS based on current destination -->
                         </div>
