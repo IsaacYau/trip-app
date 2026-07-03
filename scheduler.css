@@ -1471,17 +1471,23 @@ textarea:focus {
     border-radius: var(--radius-sm);
     font-size: 0.8rem;
     border: 1px solid var(--border);
+    gap: 1rem;
 }
 
 .expense-info {
     display: flex;
     flex-direction: column;
     gap: 0.1rem;
+    flex: 1;
+    min-width: 0;
 }
 
 .expense-item-title {
     font-weight: 700;
     color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .expense-item-meta {
@@ -1494,6 +1500,8 @@ textarea:focus {
     display: flex;
     flex-direction: column;
     gap: 0.1rem;
+    flex-shrink: 0;
+    min-width: 85px;
 }
 
 .expense-amount-hkd {

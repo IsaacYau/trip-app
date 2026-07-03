@@ -45,6 +45,16 @@ function safeParseDate(dateStr) {
     return isNaN(parsed) ? new Date() : new Date(parsed);
 }
 
+function normalizeToIsoDate(dStr) {
+    if (!dStr) return "";
+    const parsed = safeParseDate(dStr);
+    if (isNaN(parsed.getTime())) return dStr;
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
 function timeToMinutes(timeStr) {
     if (!timeStr) return 0;
     const [h, m] = timeStr.split(":").map(Number);
@@ -960,74 +970,32 @@ if (typeof document !== 'undefined') {
             return new Intl.DateTimeFormat("en-CA", opts).format(now); // YYYY-MM-DD
         }
 
-        // Render the day selector strip above the expense form
+        // Render the date picker and update indicators
         function renderDaySelector() {
-            const strip = document.getElementById("day-selector-strip");
-            if (!strip) return;
+            const picker = document.getElementById("ledger-date-picker");
+            const indicator = document.getElementById("ledger-date-spending-indicator");
+            if (!picker) return;
+            
             const today = getTodayTripDay();
             if (!state.selectedExpenseDay) state.selectedExpenseDay = today;
 
-            // Gather all dates from recorded expenses
-            const expDates = state.expenses.map(e => e.day || e.date).filter(Boolean);
-            
+            // Set current value in input date format
+            picker.value = normalizeToIsoDate(state.selectedExpenseDay);
+
             // Collect days with active spending (ignoring settlements)
             const spendingDates = new Set();
             state.expenses.forEach(e => {
                 if (!e.isSettlement && e.amount > 0) {
-                    spendingDates.add(e.day || e.date);
+                    const norm = normalizeToIsoDate(e.day || e.date);
+                    if (norm) spendingDates.add(norm);
                 }
             });
 
-            // Find the earliest date in recorded expenses
-            let startDate = new Date(today);
-            startDate.setDate(startDate.getDate() - 5); // default window start
-
-            expDates.forEach(dStr => {
-                const parsed = safeParseDate(dStr);
-                if (parsed < startDate) {
-                    startDate = parsed;
-                }
-            });
-
-            // Build chronological day array from earliest date to today + 2 days
-            const days = [];
-            const endDate = new Date(today);
-            endDate.setDate(endDate.getDate() + 2); // end window
-
-            let current = new Date(startDate);
-            while (current <= endDate) {
-                days.push(current.toISOString().split("T")[0]);
-                current.setDate(current.getDate() + 1);
+            // Show or hide spending dot indicator
+            const currentSelectedNorm = normalizeToIsoDate(state.selectedExpenseDay);
+            if (indicator) {
+                indicator.style.display = spendingDates.has(currentSelectedNorm) ? "inline-flex" : "none";
             }
-
-            strip.innerHTML = days.map(iso => {
-                const isToday = iso === today;
-                const isSelected = iso === state.selectedExpenseDay;
-                const dateObj = safeParseDate(iso);
-                
-                let label = "";
-                if (isToday) {
-                    label = "Today";
-                } else if (isNaN(dateObj.getTime())) {
-                    label = iso;
-                } else {
-                    label = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                }
-
-                // Check if this date has spending
-                const hasSpending = spendingDates.has(iso);
-                const hasSpendingClass = hasSpending ? " has-spending" : "";
-
-                return `<button type="button" class="day-pill${isSelected ? " active" : ""}${isToday ? " today" : ""}${hasSpendingClass}" data-day="${iso}">${label}</button>`;
-            }).join("");
-
-            strip.querySelectorAll(".day-pill").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    state.selectedExpenseDay = btn.dataset.day;
-                    renderDaySelector();
-                    renderLedger();
-                });
-            });
         }
 
         // Render the split panel for global expenses
@@ -3180,9 +3148,10 @@ if (typeof document !== 'undefined') {
 
             // Filter by date if Show All is not active
             if (!state.showAllExpenses && state.selectedExpenseDay) {
+                const targetNorm = normalizeToIsoDate(state.selectedExpenseDay);
                 visibleExpenses = visibleExpenses.filter(exp => {
                     const dayKey = exp.day || exp.date || "Unknown";
-                    return dayKey === state.selectedExpenseDay;
+                    return normalizeToIsoDate(dayKey) === targetNorm;
                 });
             }
 
@@ -4213,6 +4182,17 @@ if (typeof document !== 'undefined') {
 
         // Wallet V2 initial renders
         renderDaySelector();
+
+        // Bind calendar date picker input
+        const datePicker = document.getElementById("ledger-date-picker");
+        if (datePicker) {
+            datePicker.addEventListener("change", (e) => {
+                state.selectedExpenseDay = e.target.value;
+                renderDaySelector();
+                renderLedger();
+            });
+        }
+
         // Ledger Show All toggle event
         const showAllBtn = document.getElementById("ledger-show-all-btn");
         if (showAllBtn) {
