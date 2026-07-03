@@ -856,6 +856,14 @@ if (typeof document !== 'undefined') {
         async function saveCashBalancesToStorage() {
             const cashKey = state.activeGroupId === "TRIP-2026" ? "travelCashBalances" : `travelCashBalances_${state.activeGroupId}`;
             localStorage.setItem(cashKey, JSON.stringify(state.cashBalances));
+            if (state.activeGroupId && state.activeGroupId !== "TRIP-2026" && db) {
+                try {
+                    const docRef = doc(db, "trip_networks", state.activeGroupId);
+                    await updateDoc(docRef, { cashBalances: state.cashBalances });
+                } catch (err) {
+                    console.error("Failed to sync Cash Balances to Firestore:", err);
+                }
+            }
         }
 
         const calendarElement = document.getElementById("calendar");
@@ -3852,21 +3860,35 @@ if (typeof document !== 'undefined') {
             const cards = state.icCards[passenger];
             icCardHolder.textContent = passenger.toUpperCase();
             
+            const currency = state.destination === "japan" ? "JPY" : (state.destination === "malaysia" ? "MYR" : "CNY");
+            const symbol = state.destination === "japan" ? "¥" : (state.destination === "malaysia" ? "RM" : "¥");
+            const rate = FX_RATES[currency] || 1.0;
+
+            // Compute transit spending logged in the ledger
+            let transitSpent = 0;
+            state.expenses.forEach(exp => {
+                if (exp.payer === passenger && exp.paymentMethod && exp.paymentMethod.type === "transit" && !exp.isSettlement) {
+                    const amtInLocal = exp.currency === currency ? exp.amount : (convertToHkd(exp.amount, exp.currency) / rate);
+                    transitSpent += amtInLocal;
+                }
+            });
+
+            const initialBal = cards[currency] || 0;
+            const currentBal = Math.max(0, initialBal - transitSpent);
+
             icCardSkin.className = "transit-card-skin";
             if (state.destination === "japan") {
                 icCardSkin.classList.add("suica-skin"); icCardLogo.textContent = "ICOCA"; icCardNetwork.textContent = "Nagoya-Osaka-Kobe IC Card";
-                icCardBalance.textContent = `¥${cards.JPY || 0}`;
+                icCardBalance.textContent = `¥${Math.round(currentBal).toLocaleString()}`;
             } else if (state.destination === "malaysia") {
                 icCardSkin.classList.add("tng-skin"); icCardLogo.textContent = "Touch 'n Go"; icCardNetwork.textContent = "Malaysia Transit System";
-                icCardBalance.textContent = `RM${(cards.MYR || 0).toFixed(2)}`;
+                icCardBalance.textContent = `RM${currentBal.toFixed(2)}`;
             } else {
                 icCardSkin.classList.add("shenzhen-skin"); icCardLogo.textContent = "Didi Wallet"; icCardNetwork.textContent = "Shenzhen Tong Account";
-                icCardBalance.textContent = `¥${cards.CNY || 0}`;
+                icCardBalance.textContent = `¥${currentBal.toFixed(2)}`;
             }
 
             icTransitLogs.innerHTML = "";
-            const currency = state.destination === "japan" ? "JPY" : (state.destination === "malaysia" ? "MYR" : "CNY");
-            const symbol = state.destination === "japan" ? "¥" : (state.destination === "malaysia" ? "RM" : "¥");
 
             const logs = cards.logs.filter(l => l.currency === currency);
             if (logs.length === 0) {
@@ -3886,13 +3908,13 @@ if (typeof document !== 'undefined') {
             });
 
             icEstimatedFare.textContent = `${symbol}${sum}`;
-            const bal = cards[currency] || 0;
+            const bal = currentBal;
             const diff = sum - bal;
             if (diff > 0) {
-                icTopupNeeded.textContent = `${symbol}${diff} (HK$${convertToHkd(diff, currency).toFixed(2)})`;
+                icTopupNeeded.textContent = `${symbol}${diff.toFixed(2)} (HK$${convertToHkd(diff, currency).toFixed(2)})`;
                 icTopupNeeded.parentElement.classList.add("highlight-alert");
             } else {
-                icTopupNeeded.textContent = `${symbol}0 (HK$0.00)`;
+                icTopupNeeded.textContent = `${symbol}0.00 (HK$0.00)`;
                 icTopupNeeded.parentElement.classList.remove("highlight-alert");
             }
         }
@@ -4229,7 +4251,7 @@ if (typeof document !== 'undefined') {
         // Bind Cash Initial Balance Set Button
         const cashSetBtn = document.getElementById("cash-set-initial-btn");
         if (cashSetBtn) {
-            cashSetBtn.addEventListener("click", () => {
+            cashSetBtn.addEventListener("click", async () => {
                 const member = document.getElementById("cash-member-select").value;
                 const amtInput = document.getElementById("cash-initial-amount");
                 const initialVal = parseFloat(amtInput.value) || 0;
@@ -4240,9 +4262,10 @@ if (typeof document !== 'undefined') {
                 state.cashBalances[member].initial = initialVal;
                 state.cashBalances[member].currency = currency;
                 
-                saveCashBalancesToStorage();
+                await saveCashBalancesToStorage();
                 renderCashTracker();
                 amtInput.value = "";
+                showToast("✅ Cash Balance Set", `${member}'s initial cash set to ${currency === "MYR" ? "RM" : "¥"}${initialVal.toLocaleString()}`);
             });
         }
 
