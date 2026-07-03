@@ -1,9 +1,8 @@
 | id | task | status | notes |
 | --- | --- | --- | --- |
-| task-01 | Explore project context | completed | Read existing transit routing code and database to understand architecture |
-| task-02 | Ask clarifying questions | completed | Ask the user one clarifying question at a time |
-| task-03 | Propose 2-3 approaches | completed | Propose options for free routing engine, APIs, and map integration |
-| task-04 | Present design | completed | Present design sections and gather feedback |
-| task-05 | Write design doc | completed | Write and commit design doc |
-| task-06 | Transition to implementation | completed | Invoke writing-plans skill |
+| task-01 | Brainstorm UI/UX upgrade with liquid glass elements | in-progress | Review glass component implementation and plan layout integration |
+| task-02 | Write design doc for liquid glass theme upgrade | not-started | Create a design document detailing class usages and CSS integration |
+| task-03 | Integrate Liquid Glass containers and buttons | not-started | Modify HTML/CSS/JS to apply the WebGL liquid glass shaders |
+| task-04 | Polish UI aesthetics (fonts, colors, theme toggle) | not-started | Apply premium aesthetics, Outfit typography, and glowing gradients |
+| task-05 | Verify UI changes | not-started | Run layout checks and verify no broken interactive elements |
 
