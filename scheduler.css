@@ -3,50 +3,50 @@
 :root {
     /* Light Theme (Default) */
     --bg-primary: #f8fafc;
-    --bg-primary-gradient: radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-                           linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    --bg-primary-gradient: radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.12) 0%, transparent 60%),
+                           linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
     --bg-card: #ffffff;
-    --bg-card-glass: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(99, 102, 241, 0.2);
+    --bg-card-glass: rgba(255, 255, 255, 0.75);
+    --glass-border: rgba(59, 130, 246, 0.25);
     --bg-header: #ffffff;
-    --text-primary: #0f172a;
+    --text-primary: #1e293b;
     --text-secondary: #475569;
-    --accent: #6366f1; /* Modern Indigo */
-    --accent-hover: #4f46e5;
-    --accent-light: #e0e7ff;
-    --accent-dark: #3730a3;
+    --accent: #3b82f6; /* Trust Blue */
+    --accent-hover: #2563eb;
+    --accent-light: #dbeafe;
+    --accent-dark: #1d4ed8;
     --border: #e2e8f0;
     --border-hover: #cbd5e1;
     --danger: #ef4444;
     --danger-hover: #dc2626;
     --success: #10b981;
-    --warning: #f59e0b;
+    --warning: #f97316; /* Orange CTA */
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    --shadow-lg: 0 10px 15px -3px rgba(99, 102, 241, 0.1), 0 4px 6px -4px rgba(99, 102, 241, 0.05);
-    --font-primary: 'Plus Jakarta Sans', sans-serif;
-    --font-heading: 'Outfit', sans-serif;
+    --shadow-lg: 0 10px 15px -3px rgba(59, 130, 246, 0.1), 0 4px 6px -4px rgba(59, 130, 246, 0.05);
+    --font-primary: 'Fira Sans', sans-serif;
+    --font-heading: 'Fira Code', monospace;
     --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Dark Theme Variables */
 [data-theme="dark"] {
-    --bg-primary: #0b0f19;
-    --bg-primary-gradient: radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-                           linear-gradient(135deg, #070b19 0%, #111827 100%);
+    --bg-primary: #070b19;
+    --bg-primary-gradient: radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.2) 0%, transparent 60%),
+                           linear-gradient(135deg, #070b19 0%, #0b0f19 100%);
     --bg-card: #131c2e;
-    --bg-card-glass: rgba(255, 255, 255, 0.05);
-    --glass-border: rgba(255, 255, 255, 0.12);
+    --bg-card-glass: rgba(19, 28, 46, 0.4);
+    --glass-border: rgba(96, 165, 250, 0.2);
     --bg-header: #131c2e;
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
-    --accent: #818cf8;
-    --accent-hover: #6366f1;
-    --accent-light: #1e1b4b;
-    --accent-dark: #4f46e5;
+    --accent: #60a5fa;
+    --accent-hover: #3b82f6;
+    --accent-light: #172554;
+    --accent-dark: #2563eb;
     --border: #1e293b;
     --border-hover: #334155;
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
