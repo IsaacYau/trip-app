@@ -1234,7 +1234,7 @@ if (typeof document !== 'undefined') {
                         if (cashSpent[exp.payer] !== undefined) cashSpent[exp.payer] += amountInLocal;
                         if (cashSpent[exp.recipient] !== undefined) cashSpent[exp.recipient] -= amountInLocal;
                     } else {
-                        if (cashSpent[exp.payer] !== undefined) cashSpent[exp.payer] += exp.amount;
+                        if (cashSpent[exp.payer] !== undefined) cashSpent[exp.payer] += amountInLocal;
                     }
                 }
             });
@@ -3227,7 +3227,7 @@ if (typeof document !== 'undefined') {
             // Group by day
             const byDay = {};
             visibleExpenses.forEach(exp => {
-                const dayKey = exp.day || exp.date || "Unknown";
+                const dayKey = normalizeToIsoDate(exp.day || exp.date || "Unknown");
                 if (!byDay[dayKey]) byDay[dayKey] = [];
                 byDay[dayKey].push(exp);
             });
@@ -3243,7 +3243,8 @@ if (typeof document !== 'undefined') {
                 const dayHeader = document.createElement("div");
                 dayHeader.className = "ledger-day-header";
                 const today = getTodayTripDay();
-                const dayLabel = dayKey === today ? `📅 Today (${dayKey})` : `📅 ${dayKey}`;
+                const isToday = normalizeToIsoDate(dayKey) === normalizeToIsoDate(today);
+                const dayLabel = isToday ? `📅 Today (${dayKey})` : `📅 ${dayKey}`;
                 dayHeader.textContent = dayLabel;
                 expensesList.appendChild(dayHeader);
 
