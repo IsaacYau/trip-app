@@ -54,8 +54,9 @@
 }
 
 body {
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
+    background: radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                linear-gradient(135deg, #070b19 0%, #111827 100%);
+    color: #f8fafc;
     font-family: var(--font-primary);
     line-height: 1.5;
     overflow-x: hidden;
@@ -234,11 +235,13 @@ body {
 
 /* Cards & Scheduler Grid */
 .card {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: var(--radius-md);
     padding: 1.25rem;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
     transition: var(--transition);
 }
 
