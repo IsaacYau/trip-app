@@ -528,7 +528,7 @@ if (typeof document !== 'undefined') {
                 });
                 if (el.id) container.element.id = el.id;
                 el.classList.forEach(cls => {
-                    if (cls !== 'card') container.element.classList.add(cls);
+                    container.element.classList.add(cls);
                 });
                 container.element.style.cssText = el.style.cssText;
                 while (el.firstChild) {
@@ -1275,7 +1275,11 @@ if (typeof document !== 'undefined') {
 
             for (let day = 1; day <= daysInMonth; day++) {
                 if ((day + firstDay - 1) % 7 === 0 && day !== 1) calendarHTML += "</tr><tr>";
-                const dayActs = state.activities.filter(a => a.day === day).sort((a, b) => timeToMinutes(a.timeStart) - timeToMinutes(b.timeStart));
+                const dayActs = state.activities.filter(a => {
+                    const aMonth = a.month !== undefined ? a.month : 5;
+                    const aYear = a.year !== undefined ? a.year : 2026;
+                    return a.day === day && aMonth === month && aYear === year;
+                }).sort((a, b) => timeToMinutes(a.timeStart) - timeToMinutes(b.timeStart));
                 let previewHTML = "";
                 if (dayActs.length > 0) {
                     previewHTML = `<div class="calendar-activities-preview">`;
@@ -1324,7 +1328,11 @@ if (typeof document !== 'undefined') {
                 return;
             }
 
-            const dayActs = state.activities.filter(a => a.day === state.selectedDay).sort((a, b) => timeToMinutes(a.timeStart) - timeToMinutes(b.timeStart));
+            const dayActs = state.activities.filter(a => {
+                const aMonth = a.month !== undefined ? a.month : 5;
+                const aYear = a.year !== undefined ? a.year : 2026;
+                return a.day === state.selectedDay && aMonth === state.currentMonth && aYear === state.currentYear;
+            }).sort((a, b) => timeToMinutes(a.timeStart) - timeToMinutes(b.timeStart));
 
             // Calculate column positioning for overlapping activities (Google Calendar style)
             const positions = new Map(); // act.id -> { colIndex, totalCols }
@@ -1642,6 +1650,8 @@ if (typeof document !== 'undefined') {
             }
 
             act.day = targetDay;
+            act.month = state.currentMonth;
+            act.year = state.currentYear;
 
             saveActivitiesToStorage();
             generateCalendar();
@@ -1768,7 +1778,19 @@ if (typeof document !== 'undefined') {
             const conflict = hasTimeConflict(state.activities, day, start, end, modalActivityIdInput.value ? id : null);
             if (conflict) { alert(`Time Conflict with "${conflict.title}"!`); return; }
 
-            const newAct = { id, day, title, category, timeStart: start, timeEnd: end, location, reminder, reminderOffset };
+            const newAct = { 
+                id, 
+                day, 
+                month: state.currentMonth, 
+                year: state.currentYear, 
+                title, 
+                category, 
+                timeStart: start, 
+                timeEnd: end, 
+                location, 
+                reminder, 
+                reminderOffset 
+            };
             if (modalActivityIdInput.value) {
                 const idx = state.activities.findIndex(a => a.id === id);
                 if (idx !== -1) state.activities[idx] = newAct;

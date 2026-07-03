@@ -3,7 +3,11 @@
 :root {
     /* Light Theme (Default) */
     --bg-primary: #f8fafc;
+    --bg-primary-gradient: radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                           linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
     --bg-card: #ffffff;
+    --bg-card-glass: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(99, 102, 241, 0.2);
     --bg-header: #ffffff;
     --text-primary: #0f172a;
     --text-secondary: #475569;
@@ -31,7 +35,11 @@
 /* Dark Theme Variables */
 [data-theme="dark"] {
     --bg-primary: #0b0f19;
+    --bg-primary-gradient: radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                           linear-gradient(135deg, #070b19 0%, #111827 100%);
     --bg-card: #131c2e;
+    --bg-card-glass: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.12);
     --bg-header: #131c2e;
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
@@ -54,9 +62,8 @@
 }
 
 body {
-    background: radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-                linear-gradient(135deg, #070b19 0%, #111827 100%);
-    color: #f8fafc;
+    background: var(--bg-primary-gradient);
+    color: var(--text-primary);
     font-family: var(--font-primary);
     line-height: 1.5;
     overflow-x: hidden;
@@ -235,13 +242,13 @@ body {
 
 /* Cards & Scheduler Grid */
 .card {
-    background: rgba(255, 255, 255, 0.05) !important;
+    background: var(--bg-card-glass) !important;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius-md);
     padding: 1.25rem;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
     transition: var(--transition);
 }
 
