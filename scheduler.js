@@ -455,10 +455,10 @@ function createPlaceCardElement(p) {
         </div>
     `;
 
-    const imgUrl = p.imageUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%233b82f6'/><stop offset='100%' stop-color='%2360a5fa'/></linearGradient></defs><rect width='100%' height='100%' fill='url(%23g)'/><g transform='translate(176, 126)'><path d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z' fill='white'/></g></svg>";
+    const imgUrl = p.imageUrl || window.fallbackImage;
     const imageHtml = `
         <div class="place-card-image-wrapper">
-            <img src="${imgUrl}" referrerpolicy="no-referrer" alt="${p.name}" class="place-card-image" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\' viewBox=\'0 0 400 300\'><defs><linearGradient id=\'g\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'><stop offset=\'0%\' stop-color=\'%233b82f6\'/><stop offset=\'100%\' stop-color=\'%2360a5fa\'/></linearGradient></defs><rect width=\'100%\' height=\'100%\' fill=\'url(%23g)\'/><g transform=\'translate(176, 126)\'><path d=\'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z\' fill=\'white\'/></g></svg>';">
+            <img src="${imgUrl}" referrerpolicy="no-referrer" alt="${p.name}" class="place-card-image" loading="lazy" decoding="async" onerror="this.onerror=null; this.src=window.fallbackImage;">
         </div>
     `;
 
@@ -520,6 +520,9 @@ function createPlaceCardElement(p) {
 // DOM WRAPPER (Browser environment only)
 // -------------------------------------------------------------------------
 if (typeof document !== 'undefined') {
+    if (typeof window !== 'undefined') {
+        window.fallbackImage = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiB2aWV3Qm94PSIwIDAgNDAwIDMwMCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjM2I4MmY2Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjNjBhNWZhIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNnKSIvPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDE3NiwgMTI2KSI+PHBhdGggZD0iTTEyIDJDOC4xMyAyIDUgNS4xMyA1IDljMCA1LjI1IDcgMTMgNyAxM3M3LTcuNzUgNy0xM2MwLTMuODctMy4xMy03LTctN3ptMCA5LjVjLTEuMzggMC0yLjUtMS4xMi0yLjUtMi41czEuMTItMi41IDIuNS0yLjUgMi41IDEuMTIgMi41IDIuNS0xLjEyIDIuNS0yLjUgMi41eiIgZmlsbD0id2hpdGUiLz48L2c+PC9zdmc+";
+    }
     document.addEventListener("DOMContentLoaded", () => {
         // Initialize Liquid Glass Containers for static card panels
         if (typeof window !== 'undefined' && window.Container) {
@@ -1737,11 +1740,11 @@ if (typeof document !== 'undefined') {
                     `;
                 }
                 
-                const previewImgUrl = matchedPlace.imageUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%233b82f6'/><stop offset='100%' stop-color='%2360a5fa'/></linearGradient></defs><rect width='100%' height='100%' fill='url(%23g)'/><g transform='translate(176, 126)'><path d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z' fill='white'/></g></svg>";
+                const previewImgUrl = matchedPlace.imageUrl || window.fallbackImage;
                 previewDiv.innerHTML = `
                     <div class="place-preview-title">📍 ${matchedPlace.name}</div>
                     <div class="place-preview-image-wrapper">
-                        <img src="${previewImgUrl}" referrerpolicy="no-referrer" alt="${matchedPlace.name}" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\' viewBox=\'0 0 400 300\'><defs><linearGradient id=\'g\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'><stop offset=\'0%\' stop-color=\'%233b82f6\'/><stop offset=\'100%\' stop-color=\'%2360a5fa\'/></linearGradient></defs><rect width=\'100%\' height=\'100%\' fill=\'url(%23g)\'/><g transform=\'translate(176, 126)\'><path d=\'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z\' fill=\'white\'/></g></svg>';">
+                        <img src="${previewImgUrl}" referrerpolicy="no-referrer" alt="${matchedPlace.name}" onerror="this.onerror=null; this.src=window.fallbackImage;">
                     </div>
                     ${reviewsHtml}
                 `;
@@ -3269,10 +3272,10 @@ if (typeof document !== 'undefined') {
                 localPriceHtml = `CNY ${p.price_local}`;
             }
 
-            const detailImgUrl = p.imageUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%233b82f6'/><stop offset='100%' stop-color='%2360a5fa'/></linearGradient></defs><rect width='100%' height='100%' fill='url(%23g)'/><g transform='translate(176, 126)'><path d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z' fill='white'/></g></svg>";
+            const detailImgUrl = p.imageUrl || window.fallbackImage;
             const imageHtml = `
                 <div class="place-detail-image-wrapper" style="width: 100%; height: 220px; overflow: hidden; border-radius: var(--radius-md); border: 1px solid var(--border); background-color: rgba(59, 130, 246, 0.08);">
-                    <img src="${detailImgUrl}" referrerpolicy="no-referrer" alt="${p.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\' viewBox=\'0 0 400 300\'><defs><linearGradient id=\'g\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'><stop offset=\'0%\' stop-color=\'%233b82f6\'/><stop offset=\'100%\' stop-color=\'%2360a5fa\'/></linearGradient></defs><rect width=\'100%\' height=\'100%\' fill=\'url(%23g)\'/><g transform=\'translate(176, 126)\'><path d=\'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z\' fill=\'white\'/></g></svg>';">
+                    <img src="${detailImgUrl}" referrerpolicy="no-referrer" alt="${p.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.src=window.fallbackImage;">
                 </div>
             `;
 

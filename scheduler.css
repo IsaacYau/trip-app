@@ -27,8 +27,8 @@
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     --shadow-lg: 0 10px 15px -3px rgba(59, 130, 246, 0.1), 0 4px 6px -4px rgba(59, 130, 246, 0.05);
-    --font-primary: 'Fira Sans', sans-serif;
-    --font-heading: 'Fira Code', monospace;
+    --font-primary: 'Plus Jakarta Sans', sans-serif;
+    --font-heading: 'Outfit', sans-serif;
     --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
