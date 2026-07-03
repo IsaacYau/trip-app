@@ -537,6 +537,54 @@ if (typeof document !== 'undefined') {
                 el.parentNode.replaceChild(container.element, el);
             });
         }
+        // Initialize Liquid Glass Buttons for interactive elements
+        if (typeof window !== 'undefined' && window.Button) {
+            const buttonSelectors = [
+                '#add-activity-btn',
+                '#gps-discover-btn',
+                '#transit-calc-btn',
+                '.nav-item'
+            ];
+            
+            buttonSelectors.forEach(selector => {
+                document.querySelectorAll(selector).forEach(el => {
+                    const text = el.textContent.trim() || 'Button';
+                    const isPill = el.classList.contains('nav-item');
+                    
+                    const button = new window.Button({
+                        text: text,
+                        fontSize: isPill ? 12 : 14,
+                        type: isPill ? 'pill' : 'rounded',
+                        tintOpacity: 0.15
+                    });
+                    
+                    if (el.id) button.element.id = el.id;
+                    el.classList.forEach(cls => {
+                        if (!['btn', 'btn-accent', 'btn-primary', 'btn-sm', 'btn-block', 'nav-item'].includes(cls)) {
+                            button.element.classList.add(cls);
+                        }
+                    });
+                    if (el.classList.contains('nav-item')) {
+                        button.element.classList.add('nav-item');
+                    }
+                    
+                    for (let attr of el.attributes) {
+                        if (attr.name !== 'id' && attr.name !== 'class' && attr.name !== 'style') {
+                            button.element.setAttribute(attr.name, attr.value);
+                        }
+                    }
+                    
+                    const icon = el.querySelector('i');
+                    if (icon && button.textElement) {
+                        button.textElement.insertBefore(icon, button.textElement.firstChild);
+                        icon.style.marginRight = '6px';
+                    }
+                    
+                    el.parentNode.replaceChild(button.element, el);
+                });
+            });
+        }
+
 
         // State
         const state = {
