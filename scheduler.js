@@ -520,6 +520,24 @@ function createPlaceCardElement(p) {
 // -------------------------------------------------------------------------
 if (typeof document !== 'undefined') {
     document.addEventListener("DOMContentLoaded", () => {
+        // Initialize Liquid Glass Containers for static card panels
+        if (typeof window !== 'undefined' && window.Container) {
+            document.querySelectorAll('.card').forEach(el => {
+                const container = new window.Container({
+                    borderRadius: 16
+                });
+                if (el.id) container.element.id = el.id;
+                el.classList.forEach(cls => {
+                    if (cls !== 'card') container.element.classList.add(cls);
+                });
+                container.element.style.cssText = el.style.cssText;
+                while (el.firstChild) {
+                    container.element.appendChild(el.firstChild);
+                }
+                el.parentNode.replaceChild(container.element, el);
+            });
+        }
+
         // State
         const state = {
             activities: [],
