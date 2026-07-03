@@ -455,11 +455,12 @@ function createPlaceCardElement(p) {
         </div>
     `;
 
-    const imageHtml = p.imageUrl ? `
+    const imgUrl = p.imageUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%233b82f6'/><stop offset='100%' stop-color='%2360a5fa'/></linearGradient></defs><rect width='100%' height='100%' fill='url(%23g)'/><g transform='translate(176, 126)'><path d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z' fill='white'/></g></svg>";
+    const imageHtml = `
         <div class="place-card-image-wrapper">
-            <img src="${p.imageUrl}" referrerpolicy="no-referrer" alt="${p.name}" class="place-card-image" loading="lazy" decoding="async" onerror="this.parentElement.style.display='none'">
+            <img src="${imgUrl}" referrerpolicy="no-referrer" alt="${p.name}" class="place-card-image" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\' viewBox=\'0 0 400 300\'><defs><linearGradient id=\'g\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'><stop offset=\'0%\' stop-color=\'%233b82f6\'/><stop offset=\'100%\' stop-color=\'%2360a5fa\'/></linearGradient></defs><rect width=\'100%\' height=\'100%\' fill=\'url(%23g)\'/><g transform=\'translate(176, 126)\'><path d=\'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z\' fill=\'white\'/></g></svg>';">
         </div>
-    ` : "";
+    `;
 
     const reviewHtml = p.reviews && p.reviews.length > 0 ? `
         <div class="place-review-snippet" style="background-color: var(--bg-primary); border-left: 3px solid var(--accent); padding: 0.5rem; border-radius: var(--radius-sm); font-size: 0.68rem; margin: 0.5rem 0; font-style: italic; color: var(--text-secondary); line-height: 1.3; max-height: 50px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
@@ -1736,10 +1737,11 @@ if (typeof document !== 'undefined') {
                     `;
                 }
                 
+                const previewImgUrl = matchedPlace.imageUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%233b82f6'/><stop offset='100%' stop-color='%2360a5fa'/></linearGradient></defs><rect width='100%' height='100%' fill='url(%23g)'/><g transform='translate(176, 126)'><path d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z' fill='white'/></g></svg>";
                 previewDiv.innerHTML = `
                     <div class="place-preview-title">📍 ${matchedPlace.name}</div>
                     <div class="place-preview-image-wrapper">
-                        <img src="${matchedPlace.imageUrl}" referrerpolicy="no-referrer" alt="${matchedPlace.name}" onerror="this.parentElement.style.display='none'">
+                        <img src="${previewImgUrl}" referrerpolicy="no-referrer" alt="${matchedPlace.name}" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\' viewBox=\'0 0 400 300\'><defs><linearGradient id=\'g\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'><stop offset=\'0%\' stop-color=\'%233b82f6\'/><stop offset=\'100%\' stop-color=\'%2360a5fa\'/></linearGradient></defs><rect width=\'100%\' height=\'100%\' fill=\'url(%23g)\'/><g transform=\'translate(176, 126)\'><path d=\'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z\' fill=\'white\'/></g></svg>';">
                     </div>
                     ${reviewsHtml}
                 `;
@@ -3267,11 +3269,12 @@ if (typeof document !== 'undefined') {
                 localPriceHtml = `CNY ${p.price_local}`;
             }
 
-            const imageHtml = p.imageUrl ? `
-                <div class="place-detail-image-wrapper" style="width: 100%; height: 220px; overflow: hidden; border-radius: var(--radius-md); border: 1px solid var(--border); background-color: rgba(99, 102, 241, 0.08);">
-                    <img src="${p.imageUrl}" referrerpolicy="no-referrer" alt="${p.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.style.display='none'">
+            const detailImgUrl = p.imageUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%233b82f6'/><stop offset='100%' stop-color='%2360a5fa'/></linearGradient></defs><rect width='100%' height='100%' fill='url(%23g)'/><g transform='translate(176, 126)'><path d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z' fill='white'/></g></svg>";
+            const imageHtml = `
+                <div class="place-detail-image-wrapper" style="width: 100%; height: 220px; overflow: hidden; border-radius: var(--radius-md); border: 1px solid var(--border); background-color: rgba(59, 130, 246, 0.08);">
+                    <img src="${detailImgUrl}" referrerpolicy="no-referrer" alt="${p.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\' viewBox=\'0 0 400 300\'><defs><linearGradient id=\'g\' x1=\'0%\' y1=\'0%\' x2=\'100%\' y2=\'100%\'><stop offset=\'0%\' stop-color=\'%233b82f6\'/><stop offset=\'100%\' stop-color=\'%2360a5fa\'/></linearGradient></defs><rect width=\'100%\' height=\'100%\' fill=\'url(%23g)\'/><g transform=\'translate(176, 126)\'><path d=\'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z\' fill=\'white\'/></g></svg>';">
                 </div>
-            ` : "";
+            `;
 
             let reviewsHtml = "";
             if (p.reviews && p.reviews.length > 0) {
