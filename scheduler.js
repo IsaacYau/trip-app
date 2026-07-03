@@ -432,6 +432,41 @@ function curatingFallbackDb() {
     ];
 }
 
+const UNSPLASH_MAP = {
+    "nagoya": "https://images.unsplash.com/photo-1542051841857-5f90071e7989?auto=format&fit=crop&w=400&q=80",
+    "penang": "https://images.unsplash.com/photo-1596422846543-75c6fc18a52b?auto=format&fit=crop&w=400&q=80",
+    "shenzhen": "https://images.unsplash.com/photo-1548682673-fc8448f55ee4?auto=format&fit=crop&w=400&q=80",
+    "food": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=400&q=80",
+    "sights": "https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=400&q=80",
+    "shopping": "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=400&q=80",
+    "transport": "https://images.unsplash.com/photo-1494783367193-149034c05e8f?auto=format&fit=crop&w=400&q=80"
+};
+
+function getUnsplashUrl(place) {
+    if (!place) return UNSPLASH_MAP["sights"];
+    const name = (place.name || "").toLowerCase();
+    const cat = (place.category || "").toLowerCase();
+    const city = (place.city || "").toLowerCase();
+    
+    if (name.includes("castle") || name.includes("temple") || name.includes("shrine") || name.includes("nagoya castle") || name.includes("atsuta")) {
+        return "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=400&q=80"; // Castle/Temple
+    }
+    if (cat === "food" || name.includes("dinner") || name.includes("street food") || name.includes("food") || name.includes("restaurant") || name.includes("cafe") || name.includes("dim sum") || name.includes("ramen")) {
+        return UNSPLASH_MAP["food"];
+    }
+    if (cat === "shopping" || name.includes("mall") || name.includes("souvenir") || name.includes("market") || name.includes("aeon") || name.includes("outlet") || name.includes("oases")) {
+        return UNSPLASH_MAP["shopping"];
+    }
+    if (cat === "transport" || name.includes("komuter") || name.includes("train") || name.includes("bus") || name.includes("ride") || name.includes("airport") || name.includes("station") || name.includes("metro")) {
+        return UNSPLASH_MAP["transport"];
+    }
+    if (city.includes("penang") || name.includes("kek lok si") || name.includes("penang")) return UNSPLASH_MAP["penang"];
+    if (city.includes("nagoya")) return UNSPLASH_MAP["nagoya"];
+    if (city.includes("shenzhen")) return UNSPLASH_MAP["shenzhen"];
+    
+    return UNSPLASH_MAP["sights"];
+}
+
 function createPlaceCardElement(p) {
     if (typeof document === 'undefined') return null;
     const card = document.createElement("div");
@@ -455,7 +490,7 @@ function createPlaceCardElement(p) {
         </div>
     `;
 
-    const imgUrl = p.imageUrl || window.fallbackImage;
+    const imgUrl = getUnsplashUrl(p);
     const imageHtml = `
         <div class="place-card-image-wrapper">
             <img src="${imgUrl}" referrerpolicy="no-referrer" alt="${p.name}" class="place-card-image" loading="lazy" decoding="async" onerror="this.onerror=null; this.src=window.fallbackImage;">
@@ -1259,10 +1294,26 @@ if (typeof document !== 'undefined') {
         navItems.forEach(item => {
             item.addEventListener("click", () => {
                 const targetTabId = item.getAttribute("data-tab");
-                navItems.forEach(nav => nav.classList.remove("active"));
-                tabContents.forEach(tab => tab.classList.remove("active"));
-                item.classList.add("active");
-                document.getElementById(targetTabId).classList.add("active");
+                const currentActive = document.querySelector(".tab-content.active");
+                
+                if (currentActive && currentActive.id !== targetTabId) {
+                    currentActive.style.transition = "opacity 0.15s ease, transform 0.15s ease";
+                    currentActive.style.opacity = "0";
+                    currentActive.style.transform = "translateY(-8px)";
+                    
+                    setTimeout(() => {
+                        navItems.forEach(nav => nav.classList.remove("active"));
+                        tabContents.forEach(tab => {
+                            tab.classList.remove("active");
+                            tab.style.opacity = "";
+                            tab.style.transform = "";
+                            tab.style.transition = "";
+                        });
+                        item.classList.add("active");
+                        const newActive = document.getElementById(targetTabId);
+                        if (newActive) newActive.classList.add("active");
+                    }, 150);
+                }
             });
         });
 
@@ -1740,7 +1791,7 @@ if (typeof document !== 'undefined') {
                     `;
                 }
                 
-                const previewImgUrl = matchedPlace.imageUrl || window.fallbackImage;
+                const previewImgUrl = getUnsplashUrl(matchedPlace);
                 previewDiv.innerHTML = `
                     <div class="place-preview-title">📍 ${matchedPlace.name}</div>
                     <div class="place-preview-image-wrapper">
@@ -3272,7 +3323,7 @@ if (typeof document !== 'undefined') {
                 localPriceHtml = `CNY ${p.price_local}`;
             }
 
-            const detailImgUrl = p.imageUrl || window.fallbackImage;
+            const detailImgUrl = getUnsplashUrl(p);
             const imageHtml = `
                 <div class="place-detail-image-wrapper" style="width: 100%; height: 220px; overflow: hidden; border-radius: var(--radius-md); border: 1px solid var(--border); background-color: rgba(59, 130, 246, 0.08);">
                     <img src="${detailImgUrl}" referrerpolicy="no-referrer" alt="${p.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.src=window.fallbackImage;">

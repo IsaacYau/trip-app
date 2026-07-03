@@ -1134,6 +1134,17 @@ select:focus {
 }
 
 /* Places Cards & Guide Theme Branding */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .place-card {
     background-color: var(--bg-card);
     border: 1px solid var(--border);
@@ -1144,7 +1155,17 @@ select:focus {
     justify-content: space-between;
     transition: var(--transition);
     position: relative;
+    animation: slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+.place-card:nth-child(1) { animation-delay: 0.04s; }
+.place-card:nth-child(2) { animation-delay: 0.08s; }
+.place-card:nth-child(3) { animation-delay: 0.12s; }
+.place-card:nth-child(4) { animation-delay: 0.16s; }
+.place-card:nth-child(5) { animation-delay: 0.20s; }
+.place-card:nth-child(6) { animation-delay: 0.24s; }
+.place-card:nth-child(7) { animation-delay: 0.28s; }
+.place-card:nth-child(8) { animation-delay: 0.32s; }
 
 .place-card:hover {
     transform: translateY(-3px);
