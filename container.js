@@ -150,6 +150,16 @@ class Container {
     }
     
     this.initWebGL()
+
+    // Automatically observe element size changes to dynamically resize WebGL context
+    if (typeof window !== 'undefined' && window.ResizeObserver) {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.updateSizeFromDOM()
+      })
+      this.resizeObserver.observe(this.element)
+    } else {
+      window.addEventListener('resize', () => this.updateSizeFromDOM())
+    }
   }
 
   createElement() {
