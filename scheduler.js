@@ -439,7 +439,18 @@ const UNSPLASH_MAP = {
     "food": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=400&q=80",
     "sights": "https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=400&q=80",
     "shopping": "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=400&q=80",
-    "transport": "https://images.unsplash.com/photo-1494783367193-149034c05e8f?auto=format&fit=crop&w=400&q=80"
+    "transport": "https://images.unsplash.com/photo-1494783367193-149034c05e8f?auto=format&fit=crop&w=400&q=80",
+    "ramen": "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=400&q=80",
+    "sushi": "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=400&q=80",
+    "cafe": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=400&q=80",
+    "izakaya": "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=400&q=80",
+    "castle": "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=400&q=80",
+    "shrine": "https://images.unsplash.com/photo-1601042879364-f3947d3f9c16?auto=format&fit=crop&w=400&q=80",
+    "beach": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=400&q=80",
+    "park": "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=400&q=80",
+    "market": "https://images.unsplash.com/photo-1533900298318-6b8da08a523e?auto=format&fit=crop&w=400&q=80",
+    "station": "https://images.unsplash.com/photo-1542640244-7e672d6cef21?auto=format&fit=crop&w=400&q=80",
+    "airport": "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=400&q=80"
 };
 
 function getUnsplashUrl(place) {
@@ -448,19 +459,60 @@ function getUnsplashUrl(place) {
     const cat = (place.category || "").toLowerCase();
     const city = (place.city || "").toLowerCase();
     
-    if (name.includes("castle") || name.includes("temple") || name.includes("shrine") || name.includes("nagoya castle") || name.includes("atsuta")) {
-        return "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=400&q=80"; // Castle/Temple
+    // Historic and Cultural
+    if (name.includes("castle") || name.includes("nagoya castle")) {
+        return UNSPLASH_MAP["castle"];
     }
-    if (cat === "food" || name.includes("dinner") || name.includes("street food") || name.includes("food") || name.includes("restaurant") || name.includes("cafe") || name.includes("dim sum") || name.includes("ramen")) {
+    if (name.includes("temple") || name.includes("shrine") || name.includes("atsuta") || name.includes("kek lok si")) {
+        return UNSPLASH_MAP["shrine"];
+    }
+    
+    // Food Specific
+    if (name.includes("ramen") || name.includes("noodle")) {
+        return UNSPLASH_MAP["ramen"];
+    }
+    if (name.includes("sushi") || name.includes("sashimi")) {
+        return UNSPLASH_MAP["sushi"];
+    }
+    if (name.includes("izakaya") || name.includes("pub") || name.includes("beer")) {
+        return UNSPLASH_MAP["izakaya"];
+    }
+    if (name.includes("cafe") || name.includes("coffee") || name.includes("dessert") || name.includes("sweet")) {
+        return UNSPLASH_MAP["cafe"];
+    }
+    if (cat === "food" || name.includes("dinner") || name.includes("street food") || name.includes("food") || name.includes("restaurant") || name.includes("dim sum")) {
         return UNSPLASH_MAP["food"];
     }
-    if (cat === "shopping" || name.includes("mall") || name.includes("souvenir") || name.includes("market") || name.includes("aeon") || name.includes("outlet") || name.includes("oases")) {
+
+    // Leisure & Nature
+    if (name.includes("beach") || name.includes("ocean") || name.includes("sea") || name.includes("island") || name.includes("coast")) {
+        return UNSPLASH_MAP["beach"];
+    }
+    if (name.includes("park") || name.includes("garden") || name.includes("forest") || name.includes("hill")) {
+        return UNSPLASH_MAP["park"];
+    }
+
+    // Shopping
+    if (name.includes("market") || name.includes("bazaar") || name.includes("street market") || name.includes("night market")) {
+        return UNSPLASH_MAP["market"];
+    }
+    if (cat === "shopping" || name.includes("mall") || name.includes("souvenir") || name.includes("aeon") || name.includes("outlet") || name.includes("store")) {
         return UNSPLASH_MAP["shopping"];
     }
-    if (cat === "transport" || name.includes("komuter") || name.includes("train") || name.includes("bus") || name.includes("ride") || name.includes("airport") || name.includes("station") || name.includes("metro")) {
+
+    // Transit
+    if (name.includes("airport") || name.includes("flight")) {
+        return UNSPLASH_MAP["airport"];
+    }
+    if (name.includes("station") || name.includes("subway") || name.includes("metro") || name.includes("train") || name.includes("komuter")) {
+        return UNSPLASH_MAP["station"];
+    }
+    if (cat === "transport" || name.includes("bus") || name.includes("ride") || name.includes("transit")) {
         return UNSPLASH_MAP["transport"];
     }
-    if (city.includes("penang") || name.includes("kek lok si") || name.includes("penang")) return UNSPLASH_MAP["penang"];
+
+    // City defaults
+    if (city.includes("penang")) return UNSPLASH_MAP["penang"];
     if (city.includes("nagoya")) return UNSPLASH_MAP["nagoya"];
     if (city.includes("shenzhen")) return UNSPLASH_MAP["shenzhen"];
     
