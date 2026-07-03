@@ -151,14 +151,16 @@ class Container {
     
     this.initWebGL()
 
-    // Automatically observe element size changes to dynamically resize WebGL context
-    if (typeof window !== 'undefined' && window.ResizeObserver) {
-      this.resizeObserver = new ResizeObserver(() => {
-        this.updateSizeFromDOM()
-      })
-      this.resizeObserver.observe(this.element)
-    } else {
-      window.addEventListener('resize', () => this.updateSizeFromDOM())
+    // Automatically observe element size changes to dynamically resize WebGL context (skip for Button to avoid infinite resize loops)
+    if (this.constructor.name !== 'Button') {
+      if (typeof window !== 'undefined' && window.ResizeObserver) {
+        this.resizeObserver = new ResizeObserver(() => {
+          this.updateSizeFromDOM()
+        })
+        this.resizeObserver.observe(this.element)
+      } else {
+        window.addEventListener('resize', () => this.updateSizeFromDOM())
+      }
     }
   }
 

@@ -73,8 +73,10 @@ body {
 
 /* Header */
 .app-header {
-    background-color: var(--bg-header);
-    border-bottom: 1px solid var(--border);
+    background: var(--bg-card-glass);
+    border-bottom: 1px solid var(--glass-border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -83,6 +85,7 @@ body {
     top: 0;
     z-index: 100;
     transition: var(--transition);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
 }
 
 .logo {
