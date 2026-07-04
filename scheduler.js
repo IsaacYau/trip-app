@@ -297,7 +297,17 @@ function findDijkstraRoute(destination, start, end, criteria, travelDate, travel
 async function fetchCoordinates(query) {
     if (!query || query.trim() === "") return null;
     try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+        let countryParam = "";
+        const activeDest = (typeof state !== 'undefined' && state.destination) ? state.destination : null;
+        if (activeDest === "japan") {
+            countryParam = "&countrycodes=jp";
+        } else if (activeDest === "malaysia") {
+            countryParam = "&countrycodes=my";
+        } else if (activeDest === "china") {
+            countryParam = "&countrycodes=cn";
+        }
+
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1${countryParam}`;
         const response = await fetch(url, {
             headers: {
                 "Accept": "application/json",
