@@ -237,22 +237,20 @@ function findDijkstraRoute(destination, start, end, criteria, travelDate, travel
                     baseInterval = edge.schedule;
                 }
             }
-            const waitTime = (baseInterval * intervalMultiplier) / 2;
+            const lastLink = prevLink[u];
+            const isBoardingOrTransfer = !lastLink || lastLink.line !== edge.line;
+            const waitTime = isBoardingOrTransfer ? ((baseInterval * intervalMultiplier) / 2) : 0;
 
             if (criteria === "time") {
-                // Primary: Time + Wait Time + Transfer Penalties. Tie-breaker: Fare
-                const lastLink = prevLink[u];
-                const isTransfer = lastLink && lastLink.line !== edge.line;
-                const transferPenalty = isTransfer ? 10 : 0;
+                // Primary: Time + Wait Time + Transfer walking overhead (2m). Tie-breaker: Fare
+                const transferPenalty = (lastLink && lastLink.line !== edge.line) ? 2 : 0;
                 weight = (edge.time + waitTime) + transferPenalty + (edge.fare * 0.0001);
             } else if (criteria === "fare") {
                 // Primary: Fare. Tie-breaker: Time + Wait Time
                 weight = edge.fare + ((edge.time + waitTime) * 0.0001);
             } else {
-                // Optimized / balanced: balances time, wait time, fare, and transfer penalty
-                const lastLink = prevLink[u];
-                const isTransfer = lastLink && lastLink.line !== edge.line;
-                const transferPenalty = isTransfer ? 15 : 0;
+                // Optimized / balanced: balances time, wait time, fare, and comfort transfer penalty
+                const transferPenalty = (lastLink && lastLink.line !== edge.line) ? 15 : 0;
                 weight = (edge.time + waitTime) + (edge.fare * 0.1) + transferPenalty;
             }
 
