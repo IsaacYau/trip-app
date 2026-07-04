@@ -1146,14 +1146,27 @@ if (typeof document !== 'undefined') {
         const transitTimeEl = document.getElementById("transit-travel-time");
         if (transitTimeEl) transitTimeEl.value = timeInputVal;
 
+        function isCoordinateInDestination(lat, lon, destination) {
+            if (destination === "japan") {
+                return (lat >= 30.0 && lat <= 46.0 && lon >= 128.0 && lon <= 146.0);
+            } else if (destination === "malaysia") {
+                return (lat >= 1.0 && lat <= 8.0 && lon >= 99.0 && lon <= 120.0);
+            } else if (destination === "china") {
+                return (lat >= 18.0 && lat <= 54.0 && lon >= 73.0 && lon <= 135.0);
+            }
+            return false;
+        }
+
         // Populate current GPS location as default start location
         if (typeof navigator !== 'undefined' && navigator.geolocation && transitStartQuery && transitStartCoords) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
-                    transitStartQuery.value = "My Current Location";
-                    transitStartCoords.value = JSON.stringify({ lat, lon });
+                    if (isCoordinateInDestination(lat, lon, state.destination)) {
+                        transitStartQuery.value = "My Current Location";
+                        transitStartCoords.value = JSON.stringify({ lat, lon });
+                    }
                 },
                 (err) => {
                     console.log("GPS automatic start location skipped/denied:", err);
@@ -3165,16 +3178,25 @@ if (typeof document !== 'undefined') {
             // Fetch Walk & Cycle routes
             const fullWalk = await fetchOsrmRoute(startLocCoords, endLocCoords, "foot");
             const fullBike = await fetchOsrmRoute(startLocCoords, endLocCoords, "bicycle");
+            const fullDrive = await fetchOsrmRoute(startLocCoords, endLocCoords, "driving");
 
-            const walkTime = fullWalk ? fullWalk.duration : Math.round(getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon) * 12);
-            const bikeTime = fullBike ? fullBike.duration : Math.round(getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon) * 4);
-
-            // Calculate Grab/Taxi estimates
             const dist = getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon);
-            const taxiTime = Math.max(5, Math.round(dist * 1.5 + 4));
+            const walkDist = fullWalk ? fullWalk.distance : dist;
+            const bikeDist = fullBike ? fullBike.distance : dist;
+            const taxiDist = fullDrive ? fullDrive.distance : dist;
+
+            // Distinct travel velocities (Walk: 5km/h = 12m/km, Bike: 15km/h = 4m/km, Taxi: 45km/h = 1.33m/km + base waiting)
+            const rawWalkTime = Math.max(2, Math.round(walkDist * 12));
+            const rawBikeTime = Math.max(1, Math.round(bikeDist * 4));
+            const rawTaxiTime = Math.max(1, Math.round(taxiDist * 1.5 + 4));
+
+            const walkTime = Number(rawWalkTime.toPrecision(3));
+            const bikeTime = Number(rawBikeTime.toPrecision(3));
+            const taxiTime = Number(rawTaxiTime.toPrecision(3));
+
             const currency = state.destination === "japan" ? "JPY" : "MYR";
             const symbol = state.destination === "japan" ? "¥" : "RM";
-            const taxiFare = state.destination === "japan" ? (500 + dist * 400) : (5.00 + dist * 1.50);
+            const taxiFare = state.destination === "japan" ? (500 + taxiDist * 400) : (5.00 + taxiDist * 1.50);
 
             // Clear map layers
             transitMarkersGroup.clearLayers();
@@ -3199,11 +3221,12 @@ if (typeof document !== 'undefined') {
                 const walkPath = await fetchOsrmRoute(startLocCoords, startStationCoords, "foot");
                 if (walkPath) {
                     startWalkCoords = walkPath.coordinates;
-                    transitTimeTotal += walkPath.duration;
+                    const segmentWalkTime = Math.max(1, Math.round(walkPath.distance * 12));
+                    transitTimeTotal += segmentWalkTime;
                     transitTimelineHtml += `
                         <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 0.75rem;">
                             <span class="node-station">🚶 Walk to ${startStationName}</span>
-                            <div class="node-detail">${walkPath.duration}m • ${walkPath.distance}km</div>
+                            <div class="node-detail">${segmentWalkTime}m • ${walkPath.distance}km</div>
                         </div>
                     `;
                 }
@@ -3248,16 +3271,20 @@ if (typeof document !== 'undefined') {
                 const walkPath = await fetchOsrmRoute(endStationCoords, endLocCoords, "foot");
                 if (walkPath) {
                     endWalkCoords = walkPath.coordinates;
-                    transitTimeTotal += walkPath.duration;
+                    const segmentWalkTime = Math.max(1, Math.round(walkPath.distance * 12));
+                    transitTimeTotal += segmentWalkTime;
                     transitTimelineHtml += `
                         <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 0.75rem;">
                             <span class="node-station">🚶 Walk to destination</span>
-                            <div class="node-detail">${walkPath.duration}m • ${walkPath.distance}km</div>
+                            <div class="node-detail">${segmentWalkTime}m • ${walkPath.distance}km</div>
                         </div>
                     `;
                 }
             }
             transitTimelineHtml += `</div>`;
+
+            // Round transit time total to 3 significant figures
+            transitTimeTotal = Number(transitTimeTotal.toPrecision(3));
 
             // Function to render active profile overlays on Leaflet
             function renderProfileOnMap(profile) {
@@ -3275,7 +3302,7 @@ if (typeof document !== 'undefined') {
                     }
                     if (endWalkCoords.length > 0) L.polyline(endWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
                 } else if (profile === "taxi") {
-                    const coords = fullBike ? fullBike.coordinates : [[startLocCoords.lat, startLocCoords.lon], [endLocCoords.lat, endLocCoords.lon]];
+                    const coords = fullDrive ? fullDrive.coordinates : [[startLocCoords.lat, startLocCoords.lon], [endLocCoords.lat, endLocCoords.lon]];
                     L.polyline(coords, { color: "#dd6b20", weight: 6 }).addTo(transitPolylineGroup);
                 } else if (profile === "cycling") {
                     const coords = fullBike ? fullBike.coordinates : [[startLocCoords.lat, startLocCoords.lon], [endLocCoords.lat, endLocCoords.lon]];
@@ -3319,7 +3346,7 @@ if (typeof document !== 'undefined') {
                     </div>
                     <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
                         <div>Est. Duration: <strong>${taxiTime} mins</strong></div>
-                        <div>Est. Distance: <strong>${dist.toFixed(2)} km</strong></div>
+                        <div>Est. Distance: <strong>${taxiDist.toFixed(2)} km</strong></div>
                         <div>Est. Fare: <strong>${symbol}${taxiFare.toFixed(2)}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${taxiHkd})</span></div>
                     </div>
                     <button class="btn btn-accent btn-block" style="margin-top:0.8rem;" id="charge-grab-wallet-btn"><i data-lucide="plus"></i> Add Ride Fare to Group Ledger</button>
@@ -3332,7 +3359,7 @@ if (typeof document !== 'undefined') {
                     </div>
                     <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
                         <div>Est. Cycling Time: <strong>${bikeTime} mins</strong></div>
-                        <div>Est. Distance: <strong>${dist.toFixed(2)} km</strong></div>
+                        <div>Est. Distance: <strong>${bikeDist.toFixed(2)} km</strong></div>
                         <div>Cost: <strong>Free (${symbol}0)</strong></div>
                     </div>
                 </div>
@@ -3344,7 +3371,7 @@ if (typeof document !== 'undefined') {
                     </div>
                     <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
                         <div>Est. Walking Time: <strong>${walkTime} mins</strong></div>
-                        <div>Est. Distance: <strong>${dist.toFixed(2)} km</strong></div>
+                        <div>Est. Distance: <strong>${walkDist.toFixed(2)} km</strong></div>
                         <div>Cost: <strong>Free (${symbol}0)</strong></div>
                     </div>
                 </div>
