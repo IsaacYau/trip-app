@@ -240,14 +240,17 @@ function findDijkstraRoute(destination, start, end, criteria, travelDate, travel
             const waitTime = (baseInterval * intervalMultiplier) / 2;
 
             if (criteria === "time") {
-                weight = edge.time + waitTime;
+                // Primary: Time + Wait Time. Tie-breaker: Fare
+                weight = (edge.time + waitTime) + (edge.fare * 0.0001);
             } else if (criteria === "fare") {
-                weight = edge.fare;
+                // Primary: Fare. Tie-breaker: Time + Wait Time
+                weight = edge.fare + ((edge.time + waitTime) * 0.0001);
             } else {
-                // Optimized / balanced
+                // Optimized / balanced: balances time, wait time, fare, and transfer penalty
                 const lastLink = prevLink[u];
                 const isTransfer = lastLink && lastLink.line !== edge.line;
-                weight = edge.time + waitTime + (isTransfer ? 15 : 0);
+                const transferPenalty = isTransfer ? 15 : 0;
+                weight = (edge.time + waitTime) + (edge.fare * 0.1) + transferPenalty;
             }
 
             const alt = dist[u] + weight;
