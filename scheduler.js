@@ -1009,8 +1009,11 @@ if (typeof document !== 'undefined') {
         // Transit
         const transitTitle = document.getElementById("transit-title");
         const transitSubtitle = document.getElementById("transit-subtitle");
-        const transitStart = document.getElementById("transit-start");
-        const transitEnd = document.getElementById("transit-end");
+        const transitStartQuery = document.getElementById("transit-start-query");
+        const transitEndQuery = document.getElementById("transit-end-query");
+        const transitStartCoords = document.getElementById("transit-start-coords");
+        const transitEndCoords = document.getElementById("transit-end-coords");
+        const transitTravelDate = document.getElementById("transit-travel-date");
         const transitCriteria = document.getElementById("transit-criteria");
         const transitCriteriaContainer = document.getElementById("transit-criteria-container");
         const taxiTypeSelect = document.getElementById("taxi-type");
@@ -1029,6 +1032,76 @@ if (typeof document !== 'undefined') {
         const gpsRecHeader = document.getElementById("gps-recommendations-header");
         const gpsRecGrid = document.getElementById("gps-recommendations");
         const gpsPaginationContainer = document.getElementById("gps-pagination-container");
+
+        // Transit map variables & database loader
+        let transitMapObj = null;
+        let transitMarkersGroup = null;
+        let transitPolylineGroup = null;
+
+        fetch("malaysia_transit_db.json")
+            .then(r => { if (r.ok) return r.json(); })
+            .then(data => {
+                if (data && data.nodes && data.links) {
+                    TRANSIT_NETWORKS.malaysia.nodes = Object.keys(data.nodes);
+                    TRANSIT_NETWORKS.malaysia.coordinates = data.nodes;
+                    TRANSIT_NETWORKS.malaysia.links = data.links;
+                    console.log("Successfully loaded high-fidelity Malaysia GTFS network!");
+                }
+            })
+            .catch(err => {
+                console.warn("Failed to load malaysia_transit_db.json, using fallback.", err);
+            });
+
+        function setupStationAutocomplete(inputEl, hiddenCoordsEl) {
+            const container = document.createElement("div");
+            container.className = "autocomplete-suggestions";
+            if (inputEl.parentNode) {
+                if (inputEl.parentNode.style) inputEl.parentNode.style.position = "relative";
+                inputEl.parentNode.appendChild(container);
+            }
+
+            inputEl.addEventListener("input", () => {
+                const val = inputEl.value.trim().toLowerCase();
+                container.innerHTML = "";
+                if (!val) {
+                    container.style.display = "none";
+                    return;
+                }
+                const network = TRANSIT_NETWORKS[state.destination];
+                if (!network || !network.nodes) return;
+
+                const matches = network.nodes.filter(n => n.toLowerCase().includes(val)).slice(0, 5);
+                if (matches.length === 0) {
+                    container.style.display = "none";
+                    return;
+                }
+
+                container.style.display = "block";
+                matches.forEach(m => {
+                    const div = document.createElement("div");
+                    div.className = "suggestion-item";
+                    div.textContent = m;
+                    div.addEventListener("click", () => {
+                        inputEl.value = m;
+                        container.style.display = "none";
+                        const coords = network.coordinates[m];
+                        if (coords) {
+                            hiddenCoordsEl.value = JSON.stringify(coords);
+                        }
+                    });
+                    container.appendChild(div);
+                });
+            });
+
+            document.addEventListener("click", (e) => {
+                if (e.target !== inputEl) {
+                    container.style.display = "none";
+                }
+            });
+        }
+
+        if (transitStartQuery && transitStartCoords) setupStationAutocomplete(transitStartQuery, transitStartCoords);
+        if (transitEndQuery && transitEndCoords) setupStationAutocomplete(transitEndQuery, transitEndCoords);
 
         // Expenses form
         const expenseForm = document.getElementById("expense-form");
@@ -1527,7 +1600,18 @@ if (typeof document !== 'undefined') {
                         });
                         item.classList.add("active");
                         const newActive = document.getElementById(targetTabId);
-                        if (newActive) newActive.classList.add("active");
+                        if (newActive) {
+                            newActive.classList.add("active");
+                            if (targetTabId === "subway-section") {
+                                initTransitMap();
+                                setTimeout(() => {
+                                    if (transitMapObj) {
+                                        transitMapObj.invalidateSize();
+                                        updateTransitMapCenter();
+                                    }
+                                }, 50);
+                            }
+                        }
                     }, 150);
                 }
             });
@@ -2871,66 +2955,232 @@ if (typeof document !== 'undefined') {
         }
 
         function populateTransitDropdowns() {
-            transitStart.innerHTML = "";
-            transitEnd.innerHTML = "";
-            const network = TRANSIT_NETWORKS[state.destination];
-            if (!network) return;
-            network.nodes.forEach(node => {
-                const opt1 = document.createElement("option"); opt1.value = node; opt1.textContent = node; transitStart.appendChild(opt1);
-                const opt2 = document.createElement("option"); opt2.value = node; opt2.textContent = node; transitEnd.appendChild(opt2);
-            });
-            if (transitEnd.options.length > 1) transitEnd.selectedIndex = 1;
+            // Autocomplete setup has replaced dropdown population
         }
 
-        transitForm.addEventListener("submit", (e) => {
-            e.preventDefault();
-            const start = transitStart.value;
-            const end = transitEnd.value;
-            if (start === end) { alert("Stations must be different."); return; }
-            if (state.destination === "china") calculateShenzhenDidi(start, end);
-            else calculateSubwayRoute(start, end);
-        });
+        function updateTransitMapCenter() {
+            if (!transitMapObj) return;
+            const centerCoords = state.destination === "japan" ? [35.17091, 136.88153] :
+                                 state.destination === "malaysia" ? [3.13442, 101.68611] : [22.518, 114.055];
+            transitMapObj.setView(centerCoords, state.destination === "japan" ? 11 : 12);
+            transitMarkersGroup.clearLayers();
+            transitPolylineGroup.clearLayers();
+        }
 
-        function calculateSubwayRoute(start, end) {
-            const crit = transitCriteria.value;
-            const route = findDijkstraRoute(state.destination, start, end, crit);
-            if (!route) {
-                transitResultsBody.innerHTML = `<div class="empty-state"><p>No route found.</p></div>`;
+        function findNearestStation(lat, lon, destination) {
+            const coords = TRANSIT_NETWORKS[destination].coordinates;
+            let nearest = null;
+            let minDist = Infinity;
+            for (const [name, coord] of Object.entries(coords)) {
+                const dist = getHaversineDistance(lat, lon, coord.lat, coord.lon);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = name;
+                }
+            }
+            return { name: nearest, distance: minDist };
+        }
+
+        transitForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const startVal = transitStartQuery.value.trim();
+            const endVal = transitEndQuery.value.trim();
+            if (startVal === endVal) { alert("Stations must be different."); return; }
+
+            // If we are in China (Shenzhen), calculate didi taxi fare
+            if (state.destination === "china") {
+                calculateShenzhenDidi(startVal, endVal);
                 return;
             }
+
+            transitResultsBody.innerHTML = `<div class="empty-state"><div class="spinner"></div><p>Resolving locations and calculating route...</p></div>`;
+
+            const network = TRANSIT_NETWORKS[state.destination];
+            if (!network) return;
+
+            let startStationName = startVal;
+            let endStationName = endVal;
+            let startLocCoords = null;
+            let endLocCoords = null;
+
+            // 1. Resolve start node
+            if (!network.nodes.includes(startVal)) {
+                const coords = await fetchCoordinates(startVal);
+                if (coords) {
+                    startLocCoords = { lat: coords.lat, lon: coords.lon };
+                    const nearest = findNearestStation(coords.lat, coords.lon, state.destination);
+                    startStationName = nearest.name;
+                } else {
+                    alert(`Could not resolve location: ${startVal}`);
+                    updateTransitMapCenter();
+                    return;
+                }
+            } else {
+                const c = network.coordinates[startVal];
+                startLocCoords = { lat: c.lat, lon: c.lon };
+            }
+
+            // 2. Resolve end node
+            if (!network.nodes.includes(endVal)) {
+                const coords = await fetchCoordinates(endVal);
+                if (coords) {
+                    endLocCoords = { lat: coords.lat, lon: coords.lon };
+                    const nearest = findNearestStation(coords.lat, coords.lon, state.destination);
+                    endStationName = nearest.name;
+                } else {
+                    alert(`Could not resolve location: ${endVal}`);
+                    updateTransitMapCenter();
+                    return;
+                }
+            } else {
+                const c = network.coordinates[endVal];
+                endLocCoords = { lat: c.lat, lon: c.lon };
+            }
+
+            if (startStationName === endStationName && !startLocCoords && !endLocCoords) {
+                alert("Stations must be different.");
+                updateTransitMapCenter();
+                return;
+            }
+
+            // Dijkstra routing
+            const crit = transitCriteria.value;
+            const travelDate = transitTravelDate ? transitTravelDate.value : getTodayTripDay();
+            const route = findDijkstraRoute(state.destination, startStationName, endStationName, crit, travelDate);
+
+            if (!route && startStationName !== endStationName) {
+                transitResultsBody.innerHTML = `<div class="empty-state"><p>No transit route found between ${startStationName} and ${endStationName}.</p></div>`;
+                return;
+            }
+
+            transitMarkersGroup.clearLayers();
+            transitPolylineGroup.clearLayers();
+
             const currency = state.destination === "japan" ? "JPY" : "MYR";
             const symbol = state.destination === "japan" ? "¥" : "RM";
-            const hkdFare = convertToHkd(route.totalFare, currency).toFixed(2);
+            let totalTime = route ? route.totalTime : 0;
+            let totalFare = route ? route.totalFare : 0;
+            let transfers = route ? route.transfers : 0;
 
-            let tl = `<div class="route-timeline"><div class="timeline-node"><span class="node-station">${route.path[0]}</span><div class="node-detail">Departure</div></div>`;
-            for (let i = 0; i < route.segmentLinks.length; i++) {
-                const link = route.segmentLinks[i];
-                const next = route.path[i + 1];
-                const isTransfer = i > 0 && route.segmentLinks[i - 1].line !== link.line;
-                tl += `<div class="timeline-node ${isTransfer ? "transfer" : ""}"><span class="node-station">${next}</span><span class="node-line" style="background-color:${link.color};">${link.line}</span><div class="node-detail">${link.time}m • ${symbol}${link.fare}</div></div>`;
+            let timelineHtml = `<div class="route-timeline">`;
+
+            // Draw start marker
+            const startMarker = L.marker([startLocCoords.lat, startLocCoords.lon], {
+                title: "Start Location"
+            }).addTo(transitMarkersGroup);
+            startMarker.bindPopup(`<b>Start:</b> ${startVal}`).openPopup();
+
+            const startStationCoords = network.coordinates[startStationName];
+            const distToStartStation = getHaversineDistance(startLocCoords.lat, startLocCoords.lon, startStationCoords.lat, startStationCoords.lon);
+
+            if (distToStartStation > 0.05) {
+                const walkPath = await fetchOsrmRoute(startLocCoords, startStationCoords, "foot");
+                if (walkPath) {
+                    L.polyline(walkPath.coordinates, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
+                    totalTime += walkPath.duration;
+                    timelineHtml += `
+                        <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 1rem;">
+                            <span class="node-station">🚶 Walk to ${startStationName}</span>
+                            <div class="node-detail">${walkPath.duration} mins • ${walkPath.distance} km</div>
+                        </div>
+                    `;
+                }
             }
-            tl += `</div>`;
+
+            timelineHtml += `
+                <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 1rem;">
+                    <span class="node-station">🚉 Board at ${startStationName}</span>
+                </div>
+            `;
+
+            if (route) {
+                for (let i = 0; i < route.segmentLinks.length; i++) {
+                    const link = route.segmentLinks[i];
+                    const nextStation = route.path[i + 1];
+                    const uCoords = network.coordinates[route.path[i]];
+                    const vCoords = network.coordinates[nextStation];
+
+                    L.polyline([[uCoords.lat, uCoords.lon], [vCoords.lat, vCoords.lon]], {
+                        color: link.color || "#805ad5",
+                        weight: 6
+                    }).addTo(transitPolylineGroup);
+
+                    L.circleMarker([vCoords.lat, vCoords.lon], {
+                        radius: 6,
+                        color: link.color || "#805ad5",
+                        fillColor: "#ffffff",
+                        fillOpacity: 1,
+                        weight: 3
+                    }).addTo(transitMarkersGroup).bindPopup(`<b>Station:</b> ${nextStation}`);
+
+                    const isTransfer = i > 0 && route.segmentLinks[i - 1].line !== link.line;
+                    timelineHtml += `
+                        <div class="timeline-node ${isTransfer ? "transfer" : ""}" style="border-left: 3px solid ${link.color}; padding-left: 1.2rem; margin-bottom: 1rem;">
+                            <span class="node-station">${nextStation}</span>
+                            <span class="node-line" style="background-color:${link.color}; color:#fff; padding:2px 6px; font-size:0.65rem; font-weight:700; border-radius:3px;">${link.line}</span>
+                            <div class="node-detail">${link.time}m • ${symbol}${link.fare}</div>
+                        </div>
+                    `;
+                }
+            }
+
+            timelineHtml += `
+                <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 1rem;">
+                    <span class="node-station">🏁 Exit at ${endStationName}</span>
+                </div>
+            `;
+
+            const endStationCoords = network.coordinates[endStationName];
+            const distToEndStation = getHaversineDistance(endStationCoords.lat, endStationCoords.lon, endLocCoords.lat, endLocCoords.lon);
+            if (distToEndStation > 0.05) {
+                const walkPath = await fetchOsrmRoute(endStationCoords, endLocCoords, "foot");
+                if (walkPath) {
+                    L.polyline(walkPath.coordinates, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
+                    totalTime += walkPath.duration;
+                    timelineHtml += `
+                        <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 1rem;">
+                            <span class="node-station">🚶 Walk to destination</span>
+                            <div class="node-detail">${walkPath.duration} mins • ${walkPath.distance} km</div>
+                        </div>
+                    `;
+                }
+            }
+
+            const endMarker = L.marker([endLocCoords.lat, endLocCoords.lon], {
+                title: "End Location"
+            }).addTo(transitMarkersGroup);
+            endMarker.bindPopup(`<b>Destination:</b> ${endVal}`);
+
+            timelineHtml += `</div>`;
+
+            const group = new L.featureGroup([startMarker, endMarker]);
+            transitMapObj.fitBounds(group.getBounds().pad(0.1));
+
+            const hkdFare = convertToHkd(totalFare, currency).toFixed(2);
 
             transitResultsBody.innerHTML = `
-                ${tl}
-                <div class="transit-metrics">
-                    <div>Duration: <strong>${route.totalTime} mins</strong></div>
-                    <div>Transfers: <strong>${route.transfers}</strong></div>
-                    <div>Fare: <strong>${symbol}${route.totalFare}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${hkdFare})</span></div>
+                ${timelineHtml}
+                <div class="transit-metrics" style="background: var(--bg-card); padding: 1rem; border-radius: var(--radius-sm); margin-top: 1rem; border: 1px solid var(--border);">
+                    <div style="margin-bottom: 0.25rem;">Total Duration: <strong>${totalTime} mins</strong></div>
+                    <div style="margin-bottom: 0.25rem;">Transfers: <strong>${transfers}</strong></div>
+                    <div>Fare: <strong>${symbol}${totalFare.toFixed(2)}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${hkdFare})</span></div>
                 </div>
                 <button class="btn btn-accent btn-block" style="margin-top:1rem;" id="charge-ic-transit-btn"><i data-lucide="credit-card"></i> Add transit fare to ${state.activeUser}</button>
             `;
             if (window.lucide) lucide.createIcons();
 
             document.getElementById("charge-ic-transit-btn").addEventListener("click", () => {
-                const log = { desc: `${start.replace(" Station", "")} ➔ ${end.replace(" Station", "")}`, fare: route.totalFare, currency };
-                state.icCards[state.activeUser][currency] -= route.totalFare;
+                const log = { desc: `${startVal.split(',')[0]} ➔ ${endVal.split(',')[0]}`, fare: totalFare, currency };
+                if (!state.icCards[state.activeUser]) {
+                    state.icCards[state.activeUser] = { JPY: 2000, MYR: 50, CNY: 100, logs: [] };
+                }
+                state.icCards[state.activeUser][currency] = Math.max(0, (state.icCards[state.activeUser][currency] || 0) - totalFare);
                 state.icCards[state.activeUser].logs.push(log);
                 saveICCardsToStorage();
                 updateIcEstimator();
-                alert(`Charged ${symbol}${route.totalFare} to ${state.activeUser}!`);
+                showToast("🚇 Fares Charged", `Deducted ${symbol}${totalFare.toFixed(2)} from ${state.activeUser}'s transit balance.`);
             });
-        }
+        });
 
         function calculateShenzhenDidi(start, end) {
             const network = TRANSIT_NETWORKS.china;
@@ -2978,7 +3228,7 @@ if (typeof document !== 'undefined') {
                 renderLedger();
                 renderDebtSettlement();
                 updateIcEstimator();
-                alert(`Added taxi fare!`);
+                showToast("✅ Taxi Fare Added", "Recorded Didi taxi ride in group ledger.");
             });
         }
 
