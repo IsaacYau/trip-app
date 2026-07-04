@@ -432,6 +432,20 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
             if (timeoutId) clearTimeout(timeoutId);
             if (!response.ok) return null;
             const data = await response.json();
+            
+            // Handle BRouter GeoJSON Format
+            if (data.features && data.features.length > 0) {
+                const route = data.features[0];
+                const trackLength = route.properties["track-length"] || route.properties["distance"] || 0;
+                const totalTime = route.properties["total-time"] || route.properties["duration"] || 0;
+                return {
+                    coordinates: route.geometry.coordinates.map(c => [c[1], c[0]]), // [lon, lat] -> [lat, lon]
+                    duration: Math.round(totalTime / 60) || 1,
+                    distance: parseFloat((trackLength / 1000).toFixed(2)) || 0.1
+                };
+            }
+            
+            // Handle OSRM Format
             if (data && data.routes && data.routes.length > 0) {
                 const route = data.routes[0];
                 return {
@@ -441,7 +455,7 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
                 };
             }
         } catch (e) {
-            clearTimeout(timeoutId);
+            if (timeoutId) clearTimeout(timeoutId);
             console.error("OSRM fetch error", e);
         }
         return null;
@@ -452,11 +466,22 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     }
 
     if (mode === "foot") {
-        let res = await queryUrl(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+        // Try BRouter trekking first for authentic pedestrian routing!
+        const brouterUrl = `https://brouter.de/brouter?lon1=${startCoord.lon}&lat1=${startCoord.lat}&lon2=${endCoord.lon}&lat2=${endCoord.lat}&profile=trekking&alternativeidx=0&format=geojson`;
+        let res = await queryUrl(brouterUrl);
+        if (res) return res;
+
+        // Fallback to openstreetmap.de foot server
+        res = await queryUrl(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
         if (res) return res;
         return queryUrl(`https://routing.openstreetmap.de/routed-foot/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
     } else if (mode === "bicycle") {
-        let res = await queryUrl(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+        // Try BRouter bicycle profile
+        const brouterUrl = `https://brouter.de/brouter?lon1=${startCoord.lon}&lat1=${startCoord.lat}&lon2=${endCoord.lon}&lat2=${endCoord.lat}&profile=bicycle&alternativeidx=0&format=geojson`;
+        let res = await queryUrl(brouterUrl);
+        if (res) return res;
+
+        res = await queryUrl(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
         if (res) return res;
         res = await queryUrl(`https://routing.openstreetmap.de/routed-bike/route/v1/bike/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
         if (res) return res;
