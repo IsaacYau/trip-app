@@ -294,20 +294,24 @@ function findDijkstraRoute(destination, start, end, criteria, travelDate, travel
 }
 
 // Nominatim Geocoding service (100% Free)
-async function fetchCoordinates(query) {
+async function fetchCoordinates(query, limit = 1) {
     if (!query || query.trim() === "") return null;
     try {
         let countryParam = "";
+        let countrySuffix = "";
         const activeDest = (typeof state !== 'undefined' && state.destination) ? state.destination : null;
         if (activeDest === "japan") {
             countryParam = "&countrycodes=jp";
+            countrySuffix = ", Japan";
         } else if (activeDest === "malaysia") {
             countryParam = "&countrycodes=my";
+            countrySuffix = ", Malaysia";
         } else if (activeDest === "china") {
             countryParam = "&countrycodes=cn";
+            countrySuffix = ", China";
         }
 
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1${countryParam}`;
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + countrySuffix)}&limit=${limit}${countryParam}`;
         const response = await fetch(url, {
             headers: {
                 "Accept": "application/json",
@@ -317,11 +321,12 @@ async function fetchCoordinates(query) {
         if (!response.ok) return null;
         const data = await response.json();
         if (data && data.length > 0) {
-            return {
-                lat: parseFloat(data[0].lat),
-                lon: parseFloat(data[0].lon),
-                displayName: data[0].display_name
-            };
+            const results = data.map(item => ({
+                lat: parseFloat(item.lat),
+                lon: parseFloat(item.lon),
+                displayName: item.display_name
+            }));
+            return limit === 1 ? results[0] : results;
         }
     } catch (e) {
         console.error("Geocoding failed for query: " + query, e);
@@ -3127,51 +3132,145 @@ if (typeof document !== 'undefined') {
             const network = TRANSIT_NETWORKS[state.destination];
             if (!network) return;
 
-            let startStationName = null;
-            let endStationName = null;
-            let startLocCoords = null;
-            let endLocCoords = null;
+            function showLocationClarificationModal(title, matches, onSelect) {
+                const backdrop = document.createElement("div");
+                backdrop.className = "clarification-backdrop";
+                backdrop.style.position = "fixed";
+                backdrop.style.top = "0";
+                backdrop.style.left = "0";
+                backdrop.style.right = "0";
+                backdrop.style.bottom = "0";
+                backdrop.style.background = "rgba(0,0,0,0.5)";
+                backdrop.style.display = "flex";
+                backdrop.style.alignItems = "center";
+                backdrop.style.justifyContent = "center";
+                backdrop.style.zIndex = "10000";
+                backdrop.style.backdropFilter = "blur(8px)";
 
-            // 1. Resolve start node (case-insensitive node match)
-            const exactStartNode = network.nodes.find(n => n.toLowerCase() === startVal.toLowerCase());
-            if (exactStartNode) {
-                startStationName = exactStartNode;
-                const c = network.coordinates[exactStartNode];
-                startLocCoords = { lat: c.lat, lon: c.lon };
-            } else {
-                const coords = await fetchCoordinates(startVal);
-                if (coords) {
-                    startLocCoords = { lat: coords.lat, lon: coords.lon };
-                    const nearest = findNearestStation(coords.lat, coords.lon, state.destination);
-                    startStationName = nearest.name;
-                } else {
-                    // Fallback to center coords
-                    const defaultCenter = state.destination === "japan" ? { lat: 35.17091, lon: 136.88153 } : { lat: 3.13442, lon: 101.68611 };
-                    startLocCoords = defaultCenter;
-                    startStationName = findNearestStation(defaultCenter.lat, defaultCenter.lon, state.destination).name;
-                }
+                const modal = document.createElement("div");
+                modal.className = "card modal-content-premium";
+                modal.style.width = "90%";
+                modal.style.maxWidth = "450px";
+                modal.style.padding = "1.5rem";
+                modal.style.background = "var(--bg-card)";
+                modal.style.border = "1px solid var(--border)";
+                modal.style.borderRadius = "var(--radius-md)";
+                modal.style.boxShadow = "var(--shadow-lg)";
+
+                const heading = document.createElement("h3");
+                heading.textContent = title;
+                heading.style.fontFamily = "var(--font-heading)";
+                heading.style.marginBottom = "0.75rem";
+                heading.style.fontSize = "1.1rem";
+                heading.style.color = "var(--text-primary)";
+
+                const desc = document.createElement("p");
+                desc.textContent = "Multiple locations found. Please select the correct place:";
+                desc.style.fontSize = "0.8rem";
+                desc.style.color = "var(--text-secondary)";
+                desc.style.marginBottom = "1rem";
+
+                const list = document.createElement("div");
+                list.style.display = "flex";
+                list.style.flexDirection = "column";
+                list.style.gap = "0.5rem";
+                list.style.maxHeight = "200px";
+                list.style.overflowY = "auto";
+
+                matches.forEach(item => {
+                    const btn = document.createElement("button");
+                    btn.className = "btn btn-secondary btn-block";
+                    btn.style.textAlign = "left";
+                    btn.style.fontSize = "0.75rem";
+                    btn.style.padding = "8px 12px";
+                    btn.style.whiteSpace = "normal";
+                    btn.style.lineHeight = "1.3";
+                    btn.textContent = item.displayName;
+                    btn.addEventListener("click", () => {
+                        onSelect(item);
+                        document.body.removeChild(backdrop);
+                    });
+                    list.appendChild(btn);
+                });
+
+                const cancelBtn = document.createElement("button");
+                cancelBtn.className = "btn btn-block";
+                cancelBtn.style.marginTop = "1rem";
+                cancelBtn.style.background = "transparent";
+                cancelBtn.style.border = "1px solid var(--border)";
+                cancelBtn.style.color = "var(--text-primary)";
+                cancelBtn.textContent = "Cancel";
+                cancelBtn.addEventListener("click", () => {
+                    document.body.removeChild(backdrop);
+                    transitResultsBody.innerHTML = `<div class="empty-state"><p>Search cancelled.</p></div>`;
+                });
+
+                modal.appendChild(heading);
+                modal.appendChild(desc);
+                modal.appendChild(list);
+                modal.appendChild(cancelBtn);
+                backdrop.appendChild(modal);
+                document.body.appendChild(backdrop);
             }
 
-            // 2. Resolve end node (case-insensitive node match)
-            const exactEndNode = network.nodes.find(n => n.toLowerCase() === endVal.toLowerCase());
-            if (exactEndNode) {
-                endStationName = exactEndNode;
-                const c = network.coordinates[exactEndNode];
-                endLocCoords = { lat: c.lat, lon: c.lon };
-            } else {
-                const coords = await fetchCoordinates(endVal);
-                if (coords) {
-                    endLocCoords = { lat: coords.lat, lon: coords.lon };
-                    const nearest = findNearestStation(coords.lat, coords.lon, state.destination);
-                    endStationName = nearest.name;
-                } else {
-                    // Fallback to second node
-                    const nextNode = network.nodes[1] || network.nodes[0];
-                    const c = network.coordinates[nextNode];
-                    endLocCoords = { lat: c.lat, lon: c.lon };
-                    endStationName = nextNode;
+            async function resolveCoords(val, label) {
+                const network = TRANSIT_NETWORKS[state.destination];
+                // Check station match case-insensitive
+                const exactNode = network.nodes.find(n => n.toLowerCase() === val.toLowerCase());
+                if (exactNode) {
+                    const c = network.coordinates[exactNode];
+                    return { name: exactNode, coords: { lat: c.lat, lon: c.lon } };
                 }
+
+                // Check if current location coordinate is already populated
+                if (val === "My Current Location") {
+                    const hiddenVal = label.toLowerCase() === "start" ? transitStartCoords.value : transitEndCoords.value;
+                    if (hiddenVal) {
+                        const parsed = JSON.parse(hiddenVal);
+                        const nearest = findNearestStation(parsed.lat, parsed.lon, state.destination);
+                        return { name: nearest.name, coords: parsed };
+                    }
+                }
+
+                // Query Nominatim for up to 5 results
+                const candidates = await fetchCoordinates(val, 5);
+                if (!candidates || candidates.length === 0) {
+                    return null;
+                }
+
+                if (candidates.length === 1 || !Array.isArray(candidates)) {
+                    const single = Array.isArray(candidates) ? candidates[0] : candidates;
+                    const nearest = findNearestStation(single.lat, single.lon, state.destination);
+                    return { name: nearest.name, coords: single, labelName: single.displayName };
+                }
+
+                // Show clarification modal
+                return new Promise((resolve) => {
+                    showLocationClarificationModal(`Clarify ${label} location: "${val}"`, candidates, (chosen) => {
+                        const nearest = findNearestStation(chosen.lat, chosen.lon, state.destination);
+                        resolve({ name: nearest.name, coords: chosen, labelName: chosen.displayName });
+                    });
+                });
             }
+
+            const startResolved = await resolveCoords(startVal, "Start");
+            if (!startResolved) {
+                alert(`Could not resolve location: ${startVal}`);
+                updateTransitMapCenter();
+                return;
+            }
+
+            const endResolved = await resolveCoords(endVal, "Destination");
+            if (!endResolved) {
+                alert(`Could not resolve location: ${endVal}`);
+                updateTransitMapCenter();
+                return;
+            }
+
+            const startStationName = startResolved.name;
+            const endStationName = endResolved.name;
+            const startLocCoords = startResolved.coords;
+            const endLocCoords = endResolved.coords;
 
             if (startStationName === endStationName && getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon) < 0.05) {
                 alert("Start and destination must be different.");
