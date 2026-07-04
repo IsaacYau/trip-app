@@ -240,8 +240,11 @@ function findDijkstraRoute(destination, start, end, criteria, travelDate, travel
             const waitTime = (baseInterval * intervalMultiplier) / 2;
 
             if (criteria === "time") {
-                // Primary: Time + Wait Time. Tie-breaker: Fare
-                weight = (edge.time + waitTime) + (edge.fare * 0.0001);
+                // Primary: Time + Wait Time + Transfer Penalties. Tie-breaker: Fare
+                const lastLink = prevLink[u];
+                const isTransfer = lastLink && lastLink.line !== edge.line;
+                const transferPenalty = isTransfer ? 10 : 0;
+                weight = (edge.time + waitTime) + transferPenalty + (edge.fare * 0.0001);
             } else if (criteria === "fare") {
                 // Primary: Fare. Tie-breaker: Time + Wait Time
                 weight = edge.fare + ((edge.time + waitTime) * 0.0001);
@@ -3708,17 +3711,15 @@ if (typeof document !== 'undefined') {
             function renderProfileOnMap(profile) {
                 transitPolylineGroup.clearLayers();
                 if (profile === "transit") {
-                    if (startStationName !== endStationName) {
+                    if (startStationName !== endStationName && route && route.path) {
                         if (startWalkCoords.length > 0) L.polyline(startWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
                         transitPathCoords.forEach(leg => {
                             L.polyline(leg.coords, { color: leg.color || "#805ad5", weight: 6 }).addTo(transitPolylineGroup);
                         });
-                        if (route) {
-                            route.path.slice(1).forEach(station => {
-                                const sc = network.coordinates[station];
-                                L.circleMarker([sc.lat, sc.lon], { radius: 6, color: "#e53e3e", fillColor: "#ffffff", fillOpacity: 1, weight: 3 }).addTo(transitPolylineGroup).bindPopup(`<b>Station:</b> ${station}`);
-                            });
-                        }
+                        route.path.slice(1).forEach(station => {
+                            const sc = network.coordinates[station];
+                            L.circleMarker([sc.lat, sc.lon], { radius: 6, color: "#e53e3e", fillColor: "#ffffff", fillOpacity: 1, weight: 3 }).addTo(transitPolylineGroup).bindPopup(`<b>Station:</b> ${station}`);
+                        });
                         if (endWalkCoords.length > 0) L.polyline(endWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
                     }
                 } else if (profile === "taxi") {
