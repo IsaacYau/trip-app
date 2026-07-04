@@ -293,13 +293,56 @@ function findDijkstraRoute(destination, start, end, criteria, travelDate, travel
     };
 }
 
-// Nominatim Geocoding service (100% Free)
+function getDestinationBounds(destination) {
+    if (destination === "japan") {
+        return { minLat: 30.0, maxLat: 46.0, minLon: 128.0, maxLon: 146.0 };
+    } else if (destination === "malaysia") {
+        return { minLat: 1.0, maxLat: 8.0, minLon: 99.0, maxLon: 120.0 };
+    } else if (destination === "china") {
+        return { minLat: 18.0, maxLat: 54.0, minLon: 73.0, maxLon: 135.0 };
+    }
+    return null;
+}
+
+// Nominatim Geocoding service with local database prioritization & bounding checks
 async function fetchCoordinates(query, limit = 1) {
     if (!query || query.trim() === "") return null;
+    const activeDest = (typeof state !== 'undefined' && state.destination) ? state.destination : "malaysia";
+
+    // 1. Local smart search (stations and curated items)
+    const localMatches = [];
+    const qNormalized = query.toLowerCase().trim();
+    const network = TRANSIT_NETWORKS[activeDest];
+    if (network && network.nodes) {
+        network.nodes.forEach(node => {
+            if (node.toLowerCase().includes(qNormalized)) {
+                const c = network.coordinates[node];
+                localMatches.push({
+                    lat: c.lat,
+                    lon: c.lon,
+                    displayName: `🚉 Station: ${node} (${activeDest.toUpperCase()})`
+                });
+            }
+        });
+    }
+
+    if (typeof placesDatabase !== 'undefined' && placesDatabase && placesDatabase[activeDest]) {
+        placesDatabase[activeDest].forEach(place => {
+            if (place.name && place.name.toLowerCase().includes(qNormalized)) {
+                localMatches.push({
+                    lat: place.coordinates.lat,
+                    lon: place.coordinates.lng,
+                    displayName: `📍 Curated: ${place.name} (${place.category || ''})`
+                });
+            }
+        });
+    }
+
+    // 2. Fetch Nominatim results
+    let apiMatches = [];
     try {
         let countryParam = "";
         let countrySuffix = "";
-        const activeDest = (typeof state !== 'undefined' && state.destination) ? state.destination : null;
         if (activeDest === "japan") {
             countryParam = "&countrycodes=jp";
             countrySuffix = ", Japan";
@@ -318,20 +361,44 @@ async function fetchCoordinates(query, limit = 1) {
                 "User-Agent": "RoamReadyTravelPlanner/1.0"
             }
         });
-        if (!response.ok) return null;
-        const data = await response.json();
-        if (data && data.length > 0) {
-            const results = data.map(item => ({
-                lat: parseFloat(item.lat),
-                lon: parseFloat(item.lon),
-                displayName: item.display_name
-            }));
-            return limit === 1 ? results[0] : results;
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) {
+                apiMatches = data.map(item => ({
+                    lat: parseFloat(item.lat),
+                    lon: parseFloat(item.lon),
+                    displayName: item.display_name
+                }));
+            }
         }
     } catch (e) {
         console.error("Geocoding failed for query: " + query, e);
     }
-    return null;
+
+    // 3. Merge results
+    const allMatches = [...localMatches, ...apiMatches];
+    const uniqueMatches = [];
+    allMatches.forEach(item => {
+        const isDuplicate = uniqueMatches.some(u => 
+            Math.abs(u.lat - item.lat) < 0.0001 && Math.abs(u.lon - item.lon) < 0.0001
+        );
+        if (!isDuplicate) {
+            uniqueMatches.push(item);
+        }
+    });
+
+    // 4. Boundary Box Filtering
+    const bounds = (typeof state !== 'undefined') ? getDestinationBounds(activeDest) : null;
+    let filteredMatches = uniqueMatches;
+    if (bounds) {
+        filteredMatches = uniqueMatches.filter(item => 
+            item.lat >= bounds.minLat && item.lat <= bounds.maxLat && 
+            item.lon >= bounds.minLon && item.lon <= bounds.maxLon
+        );
+    }
+
+    if (filteredMatches.length === 0) return null;
+    return limit === 1 ? filteredMatches[0] : filteredMatches.slice(0, limit);
 }
 
 // OSRM Routing service (100% Free for walking/cycling)
@@ -3097,6 +3164,17 @@ if (typeof document !== 'undefined') {
             const centerCoords = state.destination === "japan" ? [35.17091, 136.88153] :
                                  state.destination === "malaysia" ? [3.13442, 101.68611] : [22.518, 114.055];
             transitMapObj.setView(centerCoords, state.destination === "japan" ? 11 : 12);
+
+            // Restrict panning and viewport interactions strictly inside the destination country
+            const bounds = getDestinationBounds(state.destination);
+            if (bounds) {
+                const corner1 = L.latLng(bounds.minLat, bounds.minLon);
+                const corner2 = L.latLng(bounds.maxLat, bounds.maxLon);
+                const leafletBounds = L.latLngBounds(corner1, corner2);
+                transitMapObj.setMaxBounds(leafletBounds);
+                transitMapObj.options.minZoom = state.destination === "japan" ? 5 : 6;
+            }
+
             transitMarkersGroup.clearLayers();
             transitPolylineGroup.clearLayers();
         }
