@@ -307,6 +307,22 @@ function getDestinationBounds(destination) {
 // Nominatim Geocoding service with local database prioritization & bounding checks
 async function fetchCoordinates(query, limit = 1) {
     if (!query || query.trim() === "") return null;
+    
+    // Parse coordinates directly if the query is a raw "lat, lon" pair
+    const parts = query.split(",");
+    if (parts.length === 2) {
+        const lat = parseFloat(parts[0]);
+        const lon = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lon)) {
+            const item = {
+                lat: lat,
+                lon: lon,
+                displayName: `Pinpoint Location (${lat.toFixed(5)}, ${lon.toFixed(5)})`
+            };
+            return limit === 1 ? item : [item];
+        }
+    }
+
     const activeDest = (typeof state !== 'undefined' && state.destination) ? state.destination : "malaysia";
 
     // 1. Local smart search (stations and curated items)
@@ -407,8 +423,13 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     const isTestEnv = (typeof state === 'undefined');
     
     async function queryUrl(url) {
+        const hasAbort = (typeof AbortController !== 'undefined');
+        const controller = hasAbort ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 2500) : null;
         try {
-            const response = await fetch(url);
+            const fetchOpts = controller ? { signal: controller.signal } : {};
+            const response = await fetch(url, fetchOpts);
+            if (timeoutId) clearTimeout(timeoutId);
             if (!response.ok) return null;
             const data = await response.json();
             if (data && data.routes && data.routes.length > 0) {
@@ -420,6 +441,7 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
                 };
             }
         } catch (e) {
+            clearTimeout(timeoutId);
             console.error("OSRM fetch error", e);
         }
         return null;
