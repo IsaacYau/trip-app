@@ -3446,6 +3446,8 @@ if (typeof document !== 'undefined') {
             const startStationCoords = network.coordinates[startStationName];
             const distToStartStation = getHaversineDistance(startLocCoords.lat, startLocCoords.lon, startStationCoords.lat, startStationCoords.lon);
             let startWalkCoords = [];
+            let endWalkCoords = [];
+            let transitPathCoords = [];
 
             if (startStationName === endStationName) {
                 transitTimelineHtml = `
@@ -3481,7 +3483,7 @@ if (typeof document !== 'undefined') {
                     </div>
                 `;
 
-                let transitPathCoords = [];
+                transitPathCoords = [];
                 if (route) {
                     for (let i = 0; i < route.segmentLinks.length; i++) {
                         const link = route.segmentLinks[i];
@@ -3509,7 +3511,7 @@ if (typeof document !== 'undefined') {
 
                 const endStationCoords = network.coordinates[endStationName];
                 const distToEndStation = getHaversineDistance(endStationCoords.lat, endStationCoords.lon, endLocCoords.lat, endLocCoords.lon);
-                let endWalkCoords = [];
+                endWalkCoords = [];
                 if (distToEndStation > 0.05) {
                     const walkPath = await fetchOsrmRoute(endStationCoords, endLocCoords, "foot");
                     if (walkPath) {
