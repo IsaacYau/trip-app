@@ -3742,13 +3742,14 @@ if (typeof document !== 'undefined') {
             const taxiHkd = convertToHkd(taxiFare, currency).toFixed(2);
 
             const formattedStart = addMinutesToTime(travelTime, 0);
+            const transitArrival = addMinutesToTime(travelTime, transitTimeTotal);
             const taxiArrival = addMinutesToTime(travelTime, taxiTime);
             const bikeArrival = addMinutesToTime(travelTime, bikeTime);
             const walkArrival = addMinutesToTime(travelTime, walkTime);
 
             const transitBadgeHtml = (startStationName === endStationName) ?
                 `<button class="btn btn-sm btn-secondary profile-btn" data-mode="transit">🚇 Transit (N/A)</button>` :
-                `<button class="btn btn-sm btn-accent profile-btn" data-mode="transit">🚇 Transit (${transitTimeTotal}m • ${symbol}${transitFareTotal.toFixed(1)})</button>`;
+                `<button class="btn btn-sm btn-accent profile-btn" data-mode="transit">🚇 Transit (${transitTimeTotal}m • ${symbol}${transitFareTotal.toFixed(1)} • Arr: ${transitArrival})</button>`;
 
             const transitMetricsHtml = (startStationName === endStationName) ? "" : `
                 <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
@@ -3762,7 +3763,7 @@ if (typeof document !== 'undefined') {
             transitResultsBody.innerHTML = `
                 <div class="route-profiles" style="display: flex; gap: 0.4rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.4rem;">
                     ${transitBadgeHtml}
-                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-secondary" : "btn-secondary"} profile-btn" data-mode="taxi">🚗 Ride (${taxiTime}m • Arr: ${taxiArrival})</button>
+                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-secondary" : "btn-secondary"} profile-btn" data-mode="taxi">🚗 Ride (${taxiTime}m • ${symbol}${taxiFare.toFixed(0)} • Arr: ${taxiArrival})</button>
                     <button class="btn btn-sm btn-secondary profile-btn" data-mode="cycling">🚴 Bike (${bikeTime}m • Arr: ${bikeArrival})</button>
                     <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-accent" : "btn-secondary"} profile-btn" data-mode="walking">🚶 Walk (${walkTime}m • Arr: ${walkArrival})</button>
                 </div>
