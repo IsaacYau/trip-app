@@ -465,6 +465,18 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
         return queryUrl(`https://router.project-osrm.org/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
     }
 
+    const mapboxKey = (typeof localStorage !== 'undefined') ? localStorage.getItem("ROAMREADY_MAPBOX_KEY") : "";
+    if (mapboxKey) {
+        let profile = "walking";
+        if (mode === "foot") profile = "walking";
+        else if (mode === "bicycle") profile = "cycling";
+        else profile = "driving";
+
+        const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?geometries=geojson&overview=full&access_token=${mapboxKey}`;
+        let res = await queryUrl(mapboxUrl);
+        if (res) return res;
+    }
+
     if (mode === "foot") {
         // Try BRouter trekking first for authentic pedestrian routing!
         const brouterUrl = `https://brouter.de/brouter?lonlats=${startCoord.lon},${startCoord.lat}|${endCoord.lon},${endCoord.lat}&profile=trekking&alternativeidx=0&format=geojson`;
@@ -1205,6 +1217,14 @@ if (typeof document !== 'undefined') {
         const transitForm = document.getElementById("transit-form");
         const transitResultsBody = document.getElementById("transit-results-body");
         const transitCardTitle = document.getElementById("transit-card-title");
+        
+        const mapboxInput = document.getElementById("mapbox-api-key");
+        if (mapboxInput) {
+            mapboxInput.value = localStorage.getItem("ROAMREADY_MAPBOX_KEY") || "";
+            mapboxInput.addEventListener("input", (e) => {
+                localStorage.setItem("ROAMREADY_MAPBOX_KEY", e.target.value.trim());
+            });
+        }
         
         // Places
         const placesSearch = document.getElementById("places-search");
