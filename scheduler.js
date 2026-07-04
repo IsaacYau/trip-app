@@ -465,6 +465,14 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
         return queryUrl(`https://router.project-osrm.org/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
     }
 
+    // 1. If served from http/https server, route through local backend proxy to bypass CORS checks
+    const isHttp = (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http'));
+    if (isHttp) {
+        const proxyUrl = `/api/route?mode=${mode}&startLon=${startCoord.lon}&startLat=${startCoord.lat}&endLon=${endCoord.lon}&endLat=${endCoord.lat}`;
+        let res = await queryUrl(proxyUrl);
+        if (res) return res;
+    }
+
     const mapboxKey = (typeof localStorage !== 'undefined') ? localStorage.getItem("ROAMREADY_MAPBOX_KEY") : "";
     if (mapboxKey) {
         let profile = "walking";
