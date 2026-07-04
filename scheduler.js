@@ -1138,6 +1138,29 @@ if (typeof document !== 'undefined') {
         if (transitStartQuery && transitStartCoords) setupStationAutocomplete(transitStartQuery, transitStartCoords);
         if (transitEndQuery && transitEndCoords) setupStationAutocomplete(transitEndQuery, transitEndCoords);
 
+        // Set default travel date & time to current local values
+        const localNow = new Date();
+        const dateInputVal = localNow.getFullYear() + "-" + String(localNow.getMonth() + 1).padStart(2, '0') + "-" + String(localNow.getDate()).padStart(2, '0');
+        const timeInputVal = String(localNow.getHours()).padStart(2, '0') + ":" + String(localNow.getMinutes()).padStart(2, '0');
+        if (transitTravelDate) transitTravelDate.value = dateInputVal;
+        const transitTimeEl = document.getElementById("transit-travel-time");
+        if (transitTimeEl) transitTimeEl.value = timeInputVal;
+
+        // Populate current GPS location as default start location
+        if (typeof navigator !== 'undefined' && navigator.geolocation && transitStartQuery && transitStartCoords) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    transitStartQuery.value = "My Current Location";
+                    transitStartCoords.value = JSON.stringify({ lat, lon });
+                },
+                (err) => {
+                    console.log("GPS automatic start location skipped/denied:", err);
+                }
+            );
+        }
+
         // Expenses form
         const expenseForm = document.getElementById("expense-form");
         const expenseTitleInput = document.getElementById("expense-title");
@@ -2989,6 +3012,18 @@ if (typeof document !== 'undefined') {
             if (window.lucide) lucide.createIcons();
         }
 
+        window.setPinpoint = (type, lat, lng) => {
+            const coordsVal = JSON.stringify({ lat, lon: lng });
+            if (type === 'start') {
+                if (transitStartQuery) transitStartQuery.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                if (transitStartCoords) transitStartCoords.value = coordsVal;
+            } else {
+                if (transitEndQuery) transitEndQuery.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                if (transitEndCoords) transitEndCoords.value = coordsVal;
+            }
+            if (transitMapObj) transitMapObj.closePopup();
+        };
+
         function initTransitMap() {
             const mapContainer = document.getElementById("transit-map");
             if (!mapContainer || transitMapObj) return;
@@ -3005,6 +3040,24 @@ if (typeof document !== 'undefined') {
 
             transitMarkersGroup = L.layerGroup().addTo(transitMapObj);
             transitPolylineGroup = L.layerGroup().addTo(transitMapObj);
+
+            // Click listener for interactive pinpointing
+            transitMapObj.on("click", (e) => {
+                const latlng = e.latlng;
+                const popupContent = `
+                    <div style="font-family: var(--font-heading); padding: 5px; color: #1a202c;">
+                        <p style="margin: 0 0 8px 0; font-size: 0.8rem; font-weight: 700;">Pinpoint Location</p>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn btn-xs btn-accent" style="padding: 2px 8px; font-size: 0.75rem;" onclick="setPinpoint('start', ${latlng.lat}, ${latlng.lng})">Set Start</button>
+                            <button class="btn btn-xs btn-primary" style="padding: 2px 8px; font-size: 0.75rem;" onclick="setPinpoint('end', ${latlng.lat}, ${latlng.lng})">Set End</button>
+                        </div>
+                    </div>
+                `;
+                L.popup()
+                    .setLatLng(latlng)
+                    .setContent(popupContent)
+                    .openOn(transitMapObj);
+            });
         }
 
         function populateTransitDropdowns() {
