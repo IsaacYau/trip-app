@@ -3461,10 +3461,12 @@ if (typeof document !== 'undefined') {
             const travelTime = document.getElementById("transit-travel-time") ? document.getElementById("transit-travel-time").value : "12:00";
             const route = findDijkstraRoute(state.destination, startStationName, endStationName, crit, travelDate, travelTime);
 
-            // Fetch Walk & Cycle routes
-            const fullWalk = await fetchOsrmRoute(startLocCoords, endLocCoords, "foot");
-            const fullBike = await fetchOsrmRoute(startLocCoords, endLocCoords, "bicycle");
-            const fullDrive = await fetchOsrmRoute(startLocCoords, endLocCoords, "driving");
+            // Fetch Walk, Cycle, and Drive routes in parallel for speed!
+            const [fullWalk, fullBike, fullDrive] = await Promise.all([
+                fetchOsrmRoute(startLocCoords, endLocCoords, "foot"),
+                fetchOsrmRoute(startLocCoords, endLocCoords, "bicycle"),
+                fetchOsrmRoute(startLocCoords, endLocCoords, "driving")
+            ]);
 
             const dist = getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon);
             const walkDist = fullWalk ? fullWalk.distance : dist;
@@ -3542,8 +3544,40 @@ if (typeof document !== 'undefined') {
             } else {
                 transitTimelineHtml = `<div class="route-timeline">`;
                 let currentMins = 0;
-                const schedKey = travelDate === "Weekend" ? "weekend" : "weekday";
-                const intervalMultiplier = 1;
+                
+                function getLinkInterval(link, key) {
+                    if (!link || !link.schedule) return 10;
+                    let val = link.schedule[key];
+                    if (val === undefined) return 10;
+                    if (typeof val === "object" && val.interval_minutes !== undefined) {
+                        return val.interval_minutes;
+                    }
+                    return typeof val === "number" ? val : parseFloat(val) || 10;
+                }
+
+                const dateObj = travelDate ? new Date(travelDate) : new Date();
+                const day = dateObj.getDay();
+                const isWeekend = (day === 0 || day === 6);
+                const schedKey = isWeekend ? "weekend" : "weekday";
+
+                let intervalMultiplier = 1.0;
+                if (travelTime) {
+                    const [h, m] = travelTime.split(':').map(Number);
+                    const mins = h * 60 + m;
+                    if (isWeekend) {
+                        if ((mins >= 690 && mins <= 930) || (mins >= 1050 && mins <= 1200)) {
+                            intervalMultiplier = 0.7;
+                        } else {
+                            intervalMultiplier = 1.3;
+                        }
+                    } else {
+                        if ((mins >= 420 && mins <= 570) || (mins >= 1020 && mins <= 1170)) {
+                            intervalMultiplier = 0.6;
+                        } else {
+                            intervalMultiplier = 1.4;
+                        }
+                    }
+                }
 
                 // 1. Walk to start station
                 if (distToStartStation > 0.05) {
@@ -3569,7 +3603,7 @@ if (typeof document !== 'undefined') {
 
                 // Wait for the first boarding
                 const firstLink = route ? route.segmentLinks[0] : null;
-                const baseInterval = firstLink?.schedule ? (firstLink.schedule[schedKey] || 10) : 10;
+                const baseInterval = getLinkInterval(firstLink, schedKey);
                 const waitTime = Math.round((baseInterval * intervalMultiplier) / 2);
                 
                 const waitDepTime = addMinutesToTime(travelTime, currentMins);
@@ -3613,7 +3647,7 @@ if (typeof document !== 'undefined') {
                         if (i < route.segmentLinks.length - 1) {
                             const nextLink = route.segmentLinks[i + 1];
                             if (nextLink.line !== link.line) {
-                                const nextInterval = nextLink.schedule ? (nextLink.schedule[schedKey] || 10) : 10;
+                                const nextInterval = getLinkInterval(nextLink, schedKey);
                                 const transferWait = Math.round((nextInterval * intervalMultiplier) / 2);
                                 
                                 const transferDep = addMinutesToTime(travelTime, currentMins);
