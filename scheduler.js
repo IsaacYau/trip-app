@@ -3749,7 +3749,7 @@ if (typeof document !== 'undefined') {
 
             const transitBadgeHtml = (startStationName === endStationName) ?
                 `<button class="btn btn-sm btn-secondary profile-btn" data-mode="transit">🚇 Transit (N/A)</button>` :
-                `<button class="btn btn-sm btn-accent profile-btn" data-mode="transit">🚇 Transit (${transitTimeTotal}m • ${symbol}${transitFareTotal.toFixed(1)} • Arr: ${transitArrival})</button>`;
+                `<button class="btn btn-sm btn-accent profile-btn" data-mode="transit">🚇 Transit (${symbol}${transitFareTotal.toFixed(1)} • Arr: ${transitArrival})</button>`;
 
             const transitMetricsHtml = (startStationName === endStationName) ? "" : `
                 <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
@@ -3763,9 +3763,9 @@ if (typeof document !== 'undefined') {
             transitResultsBody.innerHTML = `
                 <div class="route-profiles" style="display: flex; gap: 0.4rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.4rem;">
                     ${transitBadgeHtml}
-                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-secondary" : "btn-secondary"} profile-btn" data-mode="taxi">🚗 Ride (${taxiTime}m • ${symbol}${taxiFare.toFixed(0)} • Arr: ${taxiArrival})</button>
-                    <button class="btn btn-sm btn-secondary profile-btn" data-mode="cycling">🚴 Bike (${bikeTime}m • Arr: ${bikeArrival})</button>
-                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-accent" : "btn-secondary"} profile-btn" data-mode="walking">🚶 Walk (${walkTime}m • Arr: ${walkArrival})</button>
+                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-secondary" : "btn-secondary"} profile-btn" data-mode="taxi">🚗 Ride (${symbol}${taxiFare.toFixed(0)} • Arr: ${taxiArrival})</button>
+                    <button class="btn btn-sm btn-secondary profile-btn" data-mode="cycling">🚴 Bike (Arr: ${bikeArrival})</button>
+                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-accent" : "btn-secondary"} profile-btn" data-mode="walking">🚶 Walk (Arr: ${walkArrival})</button>
                 </div>
 
                 <div id="mode-transit-content" class="mode-content-panel" style="${(startStationName === endStationName) ? "display:none;" : ""}">
