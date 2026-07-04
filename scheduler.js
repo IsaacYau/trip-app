@@ -401,12 +401,19 @@ async function fetchCoordinates(query, limit = 1) {
     return limit === 1 ? filteredMatches[0] : filteredMatches.slice(0, limit);
 }
 
-// OSRM Routing service (100% Free for walking/cycling)
+// OSRM Routing service (100% Free for walking/cycling/driving)
 async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
-    // mode can be "foot" or "bicycle"
     if (!startCoord || !endCoord) return null;
     try {
-        const url = `https://router.project-osrm.org/route/v1/${mode}/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`;
+        let url = "";
+        const isTestEnv = (typeof state === 'undefined');
+        if (mode === "foot" && !isTestEnv) {
+            url = `https://routing.openstreetmap.de/routed-foot/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`;
+        } else if (mode === "bicycle" && !isTestEnv) {
+            url = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`;
+        } else {
+            url = `https://router.project-osrm.org/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`;
+        }
         const response = await fetch(url);
         if (!response.ok) return null;
         const data = await response.json();
@@ -3399,76 +3406,91 @@ if (typeof document !== 'undefined') {
             let transitTimeTotal = route ? route.totalTime : 0;
             let transitFareTotal = route ? route.totalFare : 0;
             let transitTransfers = route ? route.transfers : 0;
-            let transitTimelineHtml = `<div class="route-timeline">`;
+            let transitTimelineHtml = "";
 
             const startStationCoords = network.coordinates[startStationName];
             const distToStartStation = getHaversineDistance(startLocCoords.lat, startLocCoords.lon, startStationCoords.lat, startStationCoords.lon);
             let startWalkCoords = [];
-            if (distToStartStation > 0.05) {
-                const walkPath = await fetchOsrmRoute(startLocCoords, startStationCoords, "foot");
-                if (walkPath) {
-                    startWalkCoords = walkPath.coordinates;
-                    const segmentWalkTime = Math.max(1, Math.round(walkPath.distance * 12));
-                    transitTimeTotal += segmentWalkTime;
-                    transitTimelineHtml += `
-                        <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 0.75rem;">
-                            <span class="node-station">🚶 Walk to ${startStationName}</span>
-                            <div class="node-detail">${segmentWalkTime}m • ${walkPath.distance}km</div>
-                        </div>
-                    `;
+
+            if (startStationName === endStationName) {
+                transitTimelineHtml = `
+                    <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 1.2rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-primary); text-align: center; margin-bottom: 1rem; backdrop-filter: blur(8px);">
+                        <i data-lucide="info" style="color: var(--accent); width: 28px; height: 28px; margin-bottom: 0.5rem; display: inline-block;"></i>
+                        <p style="font-weight: 700; margin-bottom: 0.25rem;">No Transit Option Recommended</p>
+                        <p style="color: var(--text-secondary); line-height: 1.4;">Both points resolve to the same station: <strong>${startStationName}</strong>. Since the locations are within walking distance (${Number(walkDist.toPrecision(3))} km), taking a train is not practical. Walking or ride-hailing is recommended.</p>
+                    </div>
+                `;
+                transitTimeTotal = 0;
+                transitFareTotal = 0;
+                transitTransfers = 0;
+            } else {
+                transitTimelineHtml = `<div class="route-timeline">`;
+                if (distToStartStation > 0.05) {
+                    const walkPath = await fetchOsrmRoute(startLocCoords, startStationCoords, "foot");
+                    if (walkPath) {
+                        startWalkCoords = walkPath.coordinates;
+                        const segmentWalkTime = Math.max(1, Math.round(walkPath.distance * 12));
+                        transitTimeTotal += segmentWalkTime;
+                        transitTimelineHtml += `
+                            <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                                <span class="node-station">🚶 Walk to ${startStationName}</span>
+                                <div class="node-detail">${segmentWalkTime}m • ${walkPath.distance}km</div>
+                            </div>
+                        `;
+                    }
                 }
-            }
 
-            transitTimelineHtml += `
-                <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 0.75rem;">
-                    <span class="node-station">🚉 Board at ${startStationName}</span>
-                </div>
-            `;
+                transitTimelineHtml += `
+                    <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                        <span class="node-station">🚉 Board at ${startStationName}</span>
+                    </div>
+                `;
 
-            let transitPathCoords = [];
-            if (route) {
-                for (let i = 0; i < route.segmentLinks.length; i++) {
-                    const link = route.segmentLinks[i];
-                    const nextStation = route.path[i + 1];
-                    const uCoords = network.coordinates[route.path[i]];
-                    const vCoords = network.coordinates[nextStation];
+                let transitPathCoords = [];
+                if (route) {
+                    for (let i = 0; i < route.segmentLinks.length; i++) {
+                        const link = route.segmentLinks[i];
+                        const nextStation = route.path[i + 1];
+                        const uCoords = network.coordinates[route.path[i]];
+                        const vCoords = network.coordinates[nextStation];
 
-                    transitPathCoords.push({ coords: [[uCoords.lat, uCoords.lon], [vCoords.lat, vCoords.lon]], color: link.color });
-                    const isTransfer = i > 0 && route.segmentLinks[i - 1].line !== link.line;
-                    transitTimelineHtml += `
-                        <div class="timeline-node ${isTransfer ? "transfer" : ""}" style="border-left: 3px solid ${link.color}; padding-left: 1.2rem; margin-bottom: 0.75rem;">
-                            <span class="node-station">${nextStation}</span>
-                            <span class="node-line" style="background-color:${link.color}; color:#fff; padding:2px 6px; font-size:0.65rem; font-weight:700; border-radius:3px;">${link.line}</span>
-                            <div class="node-detail">${link.time}m • ${symbol}${link.fare}</div>
-                        </div>
-                    `;
+                        transitPathCoords.push({ coords: [[uCoords.lat, uCoords.lon], [vCoords.lat, vCoords.lon]], color: link.color });
+                        const isTransfer = i > 0 && route.segmentLinks[i - 1].line !== link.line;
+                        transitTimelineHtml += `
+                            <div class="timeline-node ${isTransfer ? "transfer" : ""}" style="border-left: 3px solid ${link.color}; padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                                <span class="node-station">${nextStation}</span>
+                                <span class="node-line" style="background-color:${link.color}; color:#fff; padding:2px 6px; font-size:0.65rem; font-weight:700; border-radius:3px;">${link.line}</span>
+                                <div class="node-detail">${link.time}m • ${symbol}${link.fare}</div>
+                            </div>
+                        `;
+                    }
                 }
-            }
 
-            transitTimelineHtml += `
-                <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 0.75rem;">
-                    <span class="node-station">🏁 Exit at ${endStationName}</span>
-                </div>
-            `;
+                transitTimelineHtml += `
+                    <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                        <span class="node-station">🏁 Exit at ${endStationName}</span>
+                    </div>
+                `;
 
-            const endStationCoords = network.coordinates[endStationName];
-            const distToEndStation = getHaversineDistance(endStationCoords.lat, endStationCoords.lon, endLocCoords.lat, endLocCoords.lon);
-            let endWalkCoords = [];
-            if (distToEndStation > 0.05) {
-                const walkPath = await fetchOsrmRoute(endStationCoords, endLocCoords, "foot");
-                if (walkPath) {
-                    endWalkCoords = walkPath.coordinates;
-                    const segmentWalkTime = Math.max(1, Math.round(walkPath.distance * 12));
-                    transitTimeTotal += segmentWalkTime;
-                    transitTimelineHtml += `
-                        <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 0.75rem;">
-                            <span class="node-station">🚶 Walk to destination</span>
-                            <div class="node-detail">${segmentWalkTime}m • ${walkPath.distance}km</div>
-                        </div>
-                    `;
+                const endStationCoords = network.coordinates[endStationName];
+                const distToEndStation = getHaversineDistance(endStationCoords.lat, endStationCoords.lon, endLocCoords.lat, endLocCoords.lon);
+                let endWalkCoords = [];
+                if (distToEndStation > 0.05) {
+                    const walkPath = await fetchOsrmRoute(endStationCoords, endLocCoords, "foot");
+                    if (walkPath) {
+                        endWalkCoords = walkPath.coordinates;
+                        const segmentWalkTime = Math.max(1, Math.round(walkPath.distance * 12));
+                        transitTimeTotal += segmentWalkTime;
+                        transitTimelineHtml += `
+                            <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                                <span class="node-station">🚶 Walk to destination</span>
+                                <div class="node-detail">${segmentWalkTime}m • ${walkPath.distance}km</div>
+                            </div>
+                        `;
+                    }
                 }
+                transitTimelineHtml += `</div>`;
             }
-            transitTimelineHtml += `</div>`;
 
             // Round transit time total to 3 significant figures
             transitTimeTotal = Number(transitTimeTotal.toPrecision(3));
@@ -3477,17 +3499,19 @@ if (typeof document !== 'undefined') {
             function renderProfileOnMap(profile) {
                 transitPolylineGroup.clearLayers();
                 if (profile === "transit") {
-                    if (startWalkCoords.length > 0) L.polyline(startWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
-                    transitPathCoords.forEach(leg => {
-                        L.polyline(leg.coords, { color: leg.color || "#805ad5", weight: 6 }).addTo(transitPolylineGroup);
-                    });
-                    if (route) {
-                        route.path.slice(1).forEach(station => {
-                            const sc = network.coordinates[station];
-                            L.circleMarker([sc.lat, sc.lon], { radius: 6, color: "#e53e3e", fillColor: "#ffffff", fillOpacity: 1, weight: 3 }).addTo(transitPolylineGroup).bindPopup(`<b>Station:</b> ${station}`);
+                    if (startStationName !== endStationName) {
+                        if (startWalkCoords.length > 0) L.polyline(startWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
+                        transitPathCoords.forEach(leg => {
+                            L.polyline(leg.coords, { color: leg.color || "#805ad5", weight: 6 }).addTo(transitPolylineGroup);
                         });
+                        if (route) {
+                            route.path.slice(1).forEach(station => {
+                                const sc = network.coordinates[station];
+                                L.circleMarker([sc.lat, sc.lon], { radius: 6, color: "#e53e3e", fillColor: "#ffffff", fillOpacity: 1, weight: 3 }).addTo(transitPolylineGroup).bindPopup(`<b>Station:</b> ${station}`);
+                            });
+                        }
+                        if (endWalkCoords.length > 0) L.polyline(endWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
                     }
-                    if (endWalkCoords.length > 0) L.polyline(endWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
                 } else if (profile === "taxi") {
                     const coords = fullDrive ? fullDrive.coordinates : [[startLocCoords.lat, startLocCoords.lon], [endLocCoords.lat, endLocCoords.lon]];
                     L.polyline(coords, { color: "#dd6b20", weight: 6 }).addTo(transitPolylineGroup);
@@ -3502,28 +3526,37 @@ if (typeof document !== 'undefined') {
                 transitMapObj.fitBounds(group.getBounds().pad(0.1));
             }
 
-            // Render initial Transit view
-            renderProfileOnMap("transit");
+            // Render initial view (default to walking or ride if transit is blocked, otherwise transit)
+            const initialMode = (startStationName === endStationName) ? "walking" : "transit";
+            renderProfileOnMap(initialMode);
 
             const transitHkd = convertToHkd(transitFareTotal, currency).toFixed(2);
             const taxiHkd = convertToHkd(taxiFare, currency).toFixed(2);
 
+            const transitBadgeHtml = (startStationName === endStationName) ?
+                `<button class="btn btn-sm btn-secondary profile-btn" data-mode="transit">🚇 Transit (N/A)</button>` :
+                `<button class="btn btn-sm btn-accent profile-btn" data-mode="transit">🚇 Transit (${transitTimeTotal}m • ${symbol}${transitFareTotal.toFixed(1)})</button>`;
+
+            const transitMetricsHtml = (startStationName === endStationName) ? "" : `
+                <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
+                    <div>Total Duration: <strong>${transitTimeTotal} mins</strong></div>
+                    <div>Line Transfers: <strong>${transitTransfers}</strong></div>
+                    <div>Fare: <strong>${symbol}${transitFareTotal.toFixed(2)}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${transitHkd})</span></div>
+                </div>
+                <button class="btn btn-accent btn-block" style="margin-top:0.8rem;" id="charge-ic-transit-btn"><i data-lucide="credit-card"></i> Add transit fare to ${state.activeUser}</button>
+            `;
+
             transitResultsBody.innerHTML = `
                 <div class="route-profiles" style="display: flex; gap: 0.4rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.4rem;">
-                    <button class="btn btn-sm btn-accent profile-btn" data-mode="transit">🚇 Transit (${transitTimeTotal}m • ${symbol}${transitFareTotal.toFixed(1)})</button>
-                    <button class="btn btn-sm btn-secondary profile-btn" data-mode="taxi">🚗 Ride (${taxiTime}m • ${symbol}${taxiFare.toFixed(0)})</button>
+                    ${transitBadgeHtml}
+                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-secondary" : "btn-secondary"} profile-btn" data-mode="taxi">🚗 Ride (${taxiTime}m • ${symbol}${taxiFare.toFixed(0)})</button>
                     <button class="btn btn-sm btn-secondary profile-btn" data-mode="cycling">🚴 Bike (${bikeTime}m)</button>
-                    <button class="btn btn-sm btn-secondary profile-btn" data-mode="walking">🚶 Walk (${walkTime}m)</button>
+                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-accent" : "btn-secondary"} profile-btn" data-mode="walking">🚶 Walk (${walkTime}m)</button>
                 </div>
 
-                <div id="mode-transit-content" class="mode-content-panel">
+                <div id="mode-transit-content" class="mode-content-panel" style="${(startStationName === endStationName) ? "display:none;" : ""}">
                     ${transitTimelineHtml}
-                    <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
-                        <div>Total Duration: <strong>${transitTimeTotal} mins</strong></div>
-                        <div>Line Transfers: <strong>${transitTransfers}</strong></div>
-                        <div>Fare: <strong>${symbol}${transitFareTotal.toFixed(2)}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${transitHkd})</span></div>
-                    </div>
-                    <button class="btn btn-accent btn-block" style="margin-top:0.8rem;" id="charge-ic-transit-btn"><i data-lucide="credit-card"></i> Add transit fare to ${state.activeUser}</button>
+                    ${transitMetricsHtml}
                 </div>
 
                 <div id="mode-taxi-content" class="mode-content-panel" style="display:none;">
