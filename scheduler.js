@@ -152,7 +152,7 @@ const TRANSIT_NETWORKS = {
 };
 
 // Dijkstra Path Finder
-function findDijkstraRoute(destination, start, end, criteria, travelDate) {
+function findDijkstraRoute(destination, start, end, criteria, travelDate, travelTime) {
     const network = TRANSIT_NETWORKS[destination];
     if (!network) return null;
 
@@ -163,6 +163,27 @@ function findDijkstraRoute(destination, start, end, criteria, travelDate) {
     const day = dateObj.getDay();
     const isWeekend = (day === 0 || day === 6);
     const schedKey = isWeekend ? "weekend" : "weekday";
+
+    let intervalMultiplier = 1.0;
+    if (travelTime) {
+        const [h, m] = travelTime.split(':').map(Number);
+        const mins = h * 60 + m;
+        if (isWeekend) {
+            // Weekend Peak: 11:30 - 15:30 (690 to 930 mins) and 17:30 - 20:00 (1050 to 1200 mins)
+            if ((mins >= 690 && mins <= 930) || (mins >= 1050 && mins <= 1200)) {
+                intervalMultiplier = 0.7;
+            } else {
+                intervalMultiplier = 1.3;
+            }
+        } else {
+            // Weekday Peak: 07:00 - 09:30 (420 to 570 mins) and 17:00 - 19:30 (1020 to 1170 mins)
+            if ((mins >= 420 && mins <= 570) || (mins >= 1020 && mins <= 1170)) {
+                intervalMultiplier = 0.6;
+            } else {
+                intervalMultiplier = 1.4;
+            }
+        }
+    }
 
     const adj = {};
     nodes.forEach(n => adj[n] = []);
@@ -198,7 +219,21 @@ function findDijkstraRoute(destination, start, end, criteria, travelDate) {
             if (!queue.has(edge.node)) return;
 
             let weight = 0;
-            const waitTime = edge.schedule ? (edge.schedule[schedKey] || 10) / 2 : 0;
+            let baseInterval = 10;
+            if (edge.schedule) {
+                if (typeof edge.schedule === "object") {
+                    if (edge.schedule[schedKey] !== undefined) {
+                        if (typeof edge.schedule[schedKey] === "object" && edge.schedule[schedKey].interval_minutes !== undefined) {
+                            baseInterval = edge.schedule[schedKey].interval_minutes;
+                        } else {
+                            baseInterval = edge.schedule[schedKey];
+                        }
+                    }
+                } else {
+                    baseInterval = edge.schedule;
+                }
+            }
+            const waitTime = (baseInterval * intervalMultiplier) / 2;
 
             if (criteria === "time") {
                 weight = edge.time + waitTime;
@@ -2954,6 +2989,24 @@ if (typeof document !== 'undefined') {
             if (window.lucide) lucide.createIcons();
         }
 
+        function initTransitMap() {
+            const mapContainer = document.getElementById("transit-map");
+            if (!mapContainer || transitMapObj) return;
+            if (typeof L === 'undefined') {
+                console.warn("Leaflet library L is not loaded yet.");
+                mapContainer.innerHTML = `<div class="empty-state" style="padding:2rem;text-align:center;"><p>⚠️ Leaflet map engine is offline or loading. Please check internet connection.</p></div>`;
+                return;
+            }
+            transitMapObj = L.map("transit-map").setView([3.13442, 101.68611], 12);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "© OpenStreetMap contributors"
+            }).addTo(transitMapObj);
+
+            transitMarkersGroup = L.layerGroup().addTo(transitMapObj);
+            transitPolylineGroup = L.layerGroup().addTo(transitMapObj);
+        }
+
         function populateTransitDropdowns() {
             // Autocomplete setup has replaced dropdown population
         }
@@ -2985,7 +3038,7 @@ if (typeof document !== 'undefined') {
             e.preventDefault();
             const startVal = transitStartQuery.value.trim();
             const endVal = transitEndQuery.value.trim();
-            if (startVal === endVal) { alert("Stations must be different."); return; }
+            if (startVal === endVal) { alert("Start and destination must be different."); return; }
 
             // If we are in China (Shenzhen), calculate didi taxi fare
             if (state.destination === "china") {
@@ -2993,52 +3046,59 @@ if (typeof document !== 'undefined') {
                 return;
             }
 
-            transitResultsBody.innerHTML = `<div class="empty-state"><div class="spinner"></div><p>Resolving locations and calculating route...</p></div>`;
+            transitResultsBody.innerHTML = `<div class="empty-state"><div class="spinner"></div><p>Calculating all travel profiles (Transit, Grab, Cycle, Walk)...</p></div>`;
 
             const network = TRANSIT_NETWORKS[state.destination];
             if (!network) return;
 
-            let startStationName = startVal;
-            let endStationName = endVal;
+            let startStationName = null;
+            let endStationName = null;
             let startLocCoords = null;
             let endLocCoords = null;
 
-            // 1. Resolve start node
-            if (!network.nodes.includes(startVal)) {
+            // 1. Resolve start node (case-insensitive node match)
+            const exactStartNode = network.nodes.find(n => n.toLowerCase() === startVal.toLowerCase());
+            if (exactStartNode) {
+                startStationName = exactStartNode;
+                const c = network.coordinates[exactStartNode];
+                startLocCoords = { lat: c.lat, lon: c.lon };
+            } else {
                 const coords = await fetchCoordinates(startVal);
                 if (coords) {
                     startLocCoords = { lat: coords.lat, lon: coords.lon };
                     const nearest = findNearestStation(coords.lat, coords.lon, state.destination);
                     startStationName = nearest.name;
                 } else {
-                    alert(`Could not resolve location: ${startVal}`);
-                    updateTransitMapCenter();
-                    return;
+                    // Fallback to center coords
+                    const defaultCenter = state.destination === "japan" ? { lat: 35.17091, lon: 136.88153 } : { lat: 3.13442, lon: 101.68611 };
+                    startLocCoords = defaultCenter;
+                    startStationName = findNearestStation(defaultCenter.lat, defaultCenter.lon, state.destination).name;
                 }
-            } else {
-                const c = network.coordinates[startVal];
-                startLocCoords = { lat: c.lat, lon: c.lon };
             }
 
-            // 2. Resolve end node
-            if (!network.nodes.includes(endVal)) {
+            // 2. Resolve end node (case-insensitive node match)
+            const exactEndNode = network.nodes.find(n => n.toLowerCase() === endVal.toLowerCase());
+            if (exactEndNode) {
+                endStationName = exactEndNode;
+                const c = network.coordinates[exactEndNode];
+                endLocCoords = { lat: c.lat, lon: c.lon };
+            } else {
                 const coords = await fetchCoordinates(endVal);
                 if (coords) {
                     endLocCoords = { lat: coords.lat, lon: coords.lon };
                     const nearest = findNearestStation(coords.lat, coords.lon, state.destination);
                     endStationName = nearest.name;
                 } else {
-                    alert(`Could not resolve location: ${endVal}`);
-                    updateTransitMapCenter();
-                    return;
+                    // Fallback to second node
+                    const nextNode = network.nodes[1] || network.nodes[0];
+                    const c = network.coordinates[nextNode];
+                    endLocCoords = { lat: c.lat, lon: c.lon };
+                    endStationName = nextNode;
                 }
-            } else {
-                const c = network.coordinates[endVal];
-                endLocCoords = { lat: c.lat, lon: c.lon };
             }
 
-            if (startStationName === endStationName && !startLocCoords && !endLocCoords) {
-                alert("Stations must be different.");
+            if (startStationName === endStationName && getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon) < 0.05) {
+                alert("Start and destination must be different.");
                 updateTransitMapCenter();
                 return;
             }
@@ -3046,53 +3106,63 @@ if (typeof document !== 'undefined') {
             // Dijkstra routing
             const crit = transitCriteria.value;
             const travelDate = transitTravelDate ? transitTravelDate.value : getTodayTripDay();
-            const route = findDijkstraRoute(state.destination, startStationName, endStationName, crit, travelDate);
+            const travelTime = document.getElementById("transit-travel-time") ? document.getElementById("transit-travel-time").value : "12:00";
+            const route = findDijkstraRoute(state.destination, startStationName, endStationName, crit, travelDate, travelTime);
 
-            if (!route && startStationName !== endStationName) {
-                transitResultsBody.innerHTML = `<div class="empty-state"><p>No transit route found between ${startStationName} and ${endStationName}.</p></div>`;
-                return;
-            }
+            // Fetch Walk & Cycle routes
+            const fullWalk = await fetchOsrmRoute(startLocCoords, endLocCoords, "foot");
+            const fullBike = await fetchOsrmRoute(startLocCoords, endLocCoords, "bicycle");
 
+            const walkTime = fullWalk ? fullWalk.duration : Math.round(getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon) * 12);
+            const bikeTime = fullBike ? fullBike.duration : Math.round(getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon) * 4);
+
+            // Calculate Grab/Taxi estimates
+            const dist = getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon);
+            const taxiTime = Math.max(5, Math.round(dist * 1.5 + 4));
+            const currency = state.destination === "japan" ? "JPY" : "MYR";
+            const symbol = state.destination === "japan" ? "¥" : "RM";
+            const taxiFare = state.destination === "japan" ? (500 + dist * 400) : (5.00 + dist * 1.50);
+
+            // Clear map layers
             transitMarkersGroup.clearLayers();
             transitPolylineGroup.clearLayers();
 
-            const currency = state.destination === "japan" ? "JPY" : "MYR";
-            const symbol = state.destination === "japan" ? "¥" : "RM";
-            let totalTime = route ? route.totalTime : 0;
-            let totalFare = route ? route.totalFare : 0;
-            let transfers = route ? route.transfers : 0;
+            // Set up start & end markers
+            const startMarker = L.marker([startLocCoords.lat, startLocCoords.lon]).addTo(transitMarkersGroup);
+            startMarker.bindPopup(`<b>Start:</b> ${startVal}`);
+            const endMarker = L.marker([endLocCoords.lat, endLocCoords.lon]).addTo(transitMarkersGroup);
+            endMarker.bindPopup(`<b>Destination:</b> ${endVal}`);
 
-            let timelineHtml = `<div class="route-timeline">`;
-
-            // Draw start marker
-            const startMarker = L.marker([startLocCoords.lat, startLocCoords.lon], {
-                title: "Start Location"
-            }).addTo(transitMarkersGroup);
-            startMarker.bindPopup(`<b>Start:</b> ${startVal}`).openPopup();
+            // Pre-calculate Transit legs
+            let transitTimeTotal = route ? route.totalTime : 0;
+            let transitFareTotal = route ? route.totalFare : 0;
+            let transitTransfers = route ? route.transfers : 0;
+            let transitTimelineHtml = `<div class="route-timeline">`;
 
             const startStationCoords = network.coordinates[startStationName];
             const distToStartStation = getHaversineDistance(startLocCoords.lat, startLocCoords.lon, startStationCoords.lat, startStationCoords.lon);
-
+            let startWalkCoords = [];
             if (distToStartStation > 0.05) {
                 const walkPath = await fetchOsrmRoute(startLocCoords, startStationCoords, "foot");
                 if (walkPath) {
-                    L.polyline(walkPath.coordinates, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
-                    totalTime += walkPath.duration;
-                    timelineHtml += `
-                        <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 1rem;">
+                    startWalkCoords = walkPath.coordinates;
+                    transitTimeTotal += walkPath.duration;
+                    transitTimelineHtml += `
+                        <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 0.75rem;">
                             <span class="node-station">🚶 Walk to ${startStationName}</span>
-                            <div class="node-detail">${walkPath.duration} mins • ${walkPath.distance} km</div>
+                            <div class="node-detail">${walkPath.duration}m • ${walkPath.distance}km</div>
                         </div>
                     `;
                 }
             }
 
-            timelineHtml += `
-                <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 1rem;">
+            transitTimelineHtml += `
+                <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 0.75rem;">
                     <span class="node-station">🚉 Board at ${startStationName}</span>
                 </div>
             `;
 
+            let transitPathCoords = [];
             if (route) {
                 for (let i = 0; i < route.segmentLinks.length; i++) {
                     const link = route.segmentLinks[i];
@@ -3100,22 +3170,10 @@ if (typeof document !== 'undefined') {
                     const uCoords = network.coordinates[route.path[i]];
                     const vCoords = network.coordinates[nextStation];
 
-                    L.polyline([[uCoords.lat, uCoords.lon], [vCoords.lat, vCoords.lon]], {
-                        color: link.color || "#805ad5",
-                        weight: 6
-                    }).addTo(transitPolylineGroup);
-
-                    L.circleMarker([vCoords.lat, vCoords.lon], {
-                        radius: 6,
-                        color: link.color || "#805ad5",
-                        fillColor: "#ffffff",
-                        fillOpacity: 1,
-                        weight: 3
-                    }).addTo(transitMarkersGroup).bindPopup(`<b>Station:</b> ${nextStation}`);
-
+                    transitPathCoords.push({ coords: [[uCoords.lat, uCoords.lon], [vCoords.lat, vCoords.lon]], color: link.color });
                     const isTransfer = i > 0 && route.segmentLinks[i - 1].line !== link.line;
-                    timelineHtml += `
-                        <div class="timeline-node ${isTransfer ? "transfer" : ""}" style="border-left: 3px solid ${link.color}; padding-left: 1.2rem; margin-bottom: 1rem;">
+                    transitTimelineHtml += `
+                        <div class="timeline-node ${isTransfer ? "transfer" : ""}" style="border-left: 3px solid ${link.color}; padding-left: 1.2rem; margin-bottom: 0.75rem;">
                             <span class="node-station">${nextStation}</span>
                             <span class="node-line" style="background-color:${link.color}; color:#fff; padding:2px 6px; font-size:0.65rem; font-weight:700; border-radius:3px;">${link.line}</span>
                             <div class="node-detail">${link.time}m • ${symbol}${link.fare}</div>
@@ -3124,62 +3182,179 @@ if (typeof document !== 'undefined') {
                 }
             }
 
-            timelineHtml += `
-                <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 1rem;">
+            transitTimelineHtml += `
+                <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 0.75rem;">
                     <span class="node-station">🏁 Exit at ${endStationName}</span>
                 </div>
             `;
 
             const endStationCoords = network.coordinates[endStationName];
             const distToEndStation = getHaversineDistance(endStationCoords.lat, endStationCoords.lon, endLocCoords.lat, endLocCoords.lon);
+            let endWalkCoords = [];
             if (distToEndStation > 0.05) {
                 const walkPath = await fetchOsrmRoute(endStationCoords, endLocCoords, "foot");
                 if (walkPath) {
-                    L.polyline(walkPath.coordinates, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
-                    totalTime += walkPath.duration;
-                    timelineHtml += `
-                        <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 1rem;">
+                    endWalkCoords = walkPath.coordinates;
+                    transitTimeTotal += walkPath.duration;
+                    transitTimelineHtml += `
+                        <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 0.75rem;">
                             <span class="node-station">🚶 Walk to destination</span>
-                            <div class="node-detail">${walkPath.duration} mins • ${walkPath.distance} km</div>
+                            <div class="node-detail">${walkPath.duration}m • ${walkPath.distance}km</div>
                         </div>
                     `;
                 }
             }
+            transitTimelineHtml += `</div>`;
 
-            const endMarker = L.marker([endLocCoords.lat, endLocCoords.lon], {
-                title: "End Location"
-            }).addTo(transitMarkersGroup);
-            endMarker.bindPopup(`<b>Destination:</b> ${endVal}`);
+            // Function to render active profile overlays on Leaflet
+            function renderProfileOnMap(profile) {
+                transitPolylineGroup.clearLayers();
+                if (profile === "transit") {
+                    if (startWalkCoords.length > 0) L.polyline(startWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
+                    transitPathCoords.forEach(leg => {
+                        L.polyline(leg.coords, { color: leg.color || "#805ad5", weight: 6 }).addTo(transitPolylineGroup);
+                    });
+                    if (route) {
+                        route.path.slice(1).forEach(station => {
+                            const sc = network.coordinates[station];
+                            L.circleMarker([sc.lat, sc.lon], { radius: 6, color: "#e53e3e", fillColor: "#ffffff", fillOpacity: 1, weight: 3 }).addTo(transitPolylineGroup).bindPopup(`<b>Station:</b> ${station}`);
+                        });
+                    }
+                    if (endWalkCoords.length > 0) L.polyline(endWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
+                } else if (profile === "taxi") {
+                    const coords = fullBike ? fullBike.coordinates : [[startLocCoords.lat, startLocCoords.lon], [endLocCoords.lat, endLocCoords.lon]];
+                    L.polyline(coords, { color: "#dd6b20", weight: 6 }).addTo(transitPolylineGroup);
+                } else if (profile === "cycling") {
+                    const coords = fullBike ? fullBike.coordinates : [[startLocCoords.lat, startLocCoords.lon], [endLocCoords.lat, endLocCoords.lon]];
+                    L.polyline(coords, { color: "#38a169", weight: 6 }).addTo(transitPolylineGroup);
+                } else if (profile === "walking") {
+                    const coords = fullWalk ? fullWalk.coordinates : [[startLocCoords.lat, startLocCoords.lon], [endLocCoords.lat, endLocCoords.lon]];
+                    L.polyline(coords, { color: "#3182ce", dashArray: "5, 10", weight: 5 }).addTo(transitPolylineGroup);
+                }
+                const group = new L.featureGroup([startMarker, endMarker]);
+                transitMapObj.fitBounds(group.getBounds().pad(0.1));
+            }
 
-            timelineHtml += `</div>`;
+            // Render initial Transit view
+            renderProfileOnMap("transit");
 
-            const group = new L.featureGroup([startMarker, endMarker]);
-            transitMapObj.fitBounds(group.getBounds().pad(0.1));
-
-            const hkdFare = convertToHkd(totalFare, currency).toFixed(2);
+            const transitHkd = convertToHkd(transitFareTotal, currency).toFixed(2);
+            const taxiHkd = convertToHkd(taxiFare, currency).toFixed(2);
 
             transitResultsBody.innerHTML = `
-                ${timelineHtml}
-                <div class="transit-metrics" style="background: var(--bg-card); padding: 1rem; border-radius: var(--radius-sm); margin-top: 1rem; border: 1px solid var(--border);">
-                    <div style="margin-bottom: 0.25rem;">Total Duration: <strong>${totalTime} mins</strong></div>
-                    <div style="margin-bottom: 0.25rem;">Transfers: <strong>${transfers}</strong></div>
-                    <div>Fare: <strong>${symbol}${totalFare.toFixed(2)}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${hkdFare})</span></div>
+                <div class="route-profiles" style="display: flex; gap: 0.4rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.4rem;">
+                    <button class="btn btn-sm btn-accent profile-btn" data-mode="transit">🚇 Transit (${transitTimeTotal}m • ${symbol}${transitFareTotal.toFixed(1)})</button>
+                    <button class="btn btn-sm btn-secondary profile-btn" data-mode="taxi">🚗 Ride (${taxiTime}m • ${symbol}${taxiFare.toFixed(0)})</button>
+                    <button class="btn btn-sm btn-secondary profile-btn" data-mode="cycling">🚴 Bike (${bikeTime}m)</button>
+                    <button class="btn btn-sm btn-secondary profile-btn" data-mode="walking">🚶 Walk (${walkTime}m)</button>
                 </div>
-                <button class="btn btn-accent btn-block" style="margin-top:1rem;" id="charge-ic-transit-btn"><i data-lucide="credit-card"></i> Add transit fare to ${state.activeUser}</button>
+
+                <div id="mode-transit-content" class="mode-content-panel">
+                    ${transitTimelineHtml}
+                    <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
+                        <div>Total Duration: <strong>${transitTimeTotal} mins</strong></div>
+                        <div>Line Transfers: <strong>${transitTransfers}</strong></div>
+                        <div>Fare: <strong>${symbol}${transitFareTotal.toFixed(2)}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${transitHkd})</span></div>
+                    </div>
+                    <button class="btn btn-accent btn-block" style="margin-top:0.8rem;" id="charge-ic-transit-btn"><i data-lucide="credit-card"></i> Add transit fare to ${state.activeUser}</button>
+                </div>
+
+                <div id="mode-taxi-content" class="mode-content-panel" style="display:none;">
+                    <div style="text-align: center; padding: 0.5rem 0;">
+                        <i data-lucide="car" style="width:32px; height:32px; color:var(--accent); margin-bottom:0.25rem;"></i>
+                        <h4 style="font-family: var(--font-heading); font-size:1rem; font-weight:750;">Local Ride-Hailing (Grab/Taxi)</h4>
+                    </div>
+                    <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
+                        <div>Est. Duration: <strong>${taxiTime} mins</strong></div>
+                        <div>Est. Distance: <strong>${dist.toFixed(2)} km</strong></div>
+                        <div>Est. Fare: <strong>${symbol}${taxiFare.toFixed(2)}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${taxiHkd})</span></div>
+                    </div>
+                    <button class="btn btn-accent btn-block" style="margin-top:0.8rem;" id="charge-grab-wallet-btn"><i data-lucide="plus"></i> Add Ride Fare to Group Ledger</button>
+                </div>
+
+                <div id="mode-cycling-content" class="mode-content-panel" style="display:none;">
+                    <div style="text-align: center; padding: 0.5rem 0;">
+                        <i data-lucide="bike" style="width:32px; height:32px; color:var(--success); margin-bottom:0.25rem;"></i>
+                        <h4 style="font-family: var(--font-heading); font-size:1rem; font-weight:750;">Bicycle Route Option</h4>
+                    </div>
+                    <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
+                        <div>Est. Cycling Time: <strong>${bikeTime} mins</strong></div>
+                        <div>Est. Distance: <strong>${dist.toFixed(2)} km</strong></div>
+                        <div>Cost: <strong>Free (${symbol}0)</strong></div>
+                    </div>
+                </div>
+
+                <div id="mode-walking-content" class="mode-content-panel" style="display:none;">
+                    <div style="text-align: center; padding: 0.5rem 0;">
+                        <i data-lucide="footprints" style="width:32px; height:32px; color:#3182ce; margin-bottom:0.25rem;"></i>
+                        <h4 style="font-family: var(--font-heading); font-size:1rem; font-weight:750;">Pure Walking Option</h4>
+                    </div>
+                    <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
+                        <div>Est. Walking Time: <strong>${walkTime} mins</strong></div>
+                        <div>Est. Distance: <strong>${dist.toFixed(2)} km</strong></div>
+                        <div>Cost: <strong>Free (${symbol}0)</strong></div>
+                    </div>
+                </div>
             `;
             if (window.lucide) lucide.createIcons();
 
-            document.getElementById("charge-ic-transit-btn").addEventListener("click", () => {
-                const log = { desc: `${startVal.split(',')[0]} ➔ ${endVal.split(',')[0]}`, fare: totalFare, currency };
-                if (!state.icCards[state.activeUser]) {
-                    state.icCards[state.activeUser] = { JPY: 2000, MYR: 50, CNY: 100, logs: [] };
-                }
-                state.icCards[state.activeUser][currency] = Math.max(0, (state.icCards[state.activeUser][currency] || 0) - totalFare);
-                state.icCards[state.activeUser].logs.push(log);
-                saveICCardsToStorage();
-                updateIcEstimator();
-                showToast("🚇 Fares Charged", `Deducted ${symbol}${totalFare.toFixed(2)} from ${state.activeUser}'s transit balance.`);
+            // Profile buttons click handlers
+            const profileBtns = transitResultsBody.querySelectorAll(".profile-btn");
+            profileBtns.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const mode = btn.dataset.mode;
+                    profileBtns.forEach(b => {
+                        b.classList.remove("btn-accent");
+                        b.classList.add("btn-secondary");
+                    });
+                    btn.classList.remove("btn-secondary");
+                    btn.classList.add("btn-accent");
+
+                    transitResultsBody.querySelectorAll(".mode-content-panel").forEach(p => p.style.display = "none");
+                    const targetPanel = transitResultsBody.querySelector(`#mode-${mode}-content`);
+                    if (targetPanel) targetPanel.style.display = "block";
+                    renderProfileOnMap(mode);
+                });
             });
+
+            // Charge transit fare listener
+            const chargeTransitBtn = document.getElementById("charge-ic-transit-btn");
+            if (chargeTransitBtn) {
+                chargeTransitBtn.addEventListener("click", () => {
+                    const log = { desc: `${startVal.split(',')[0]} ➔ ${endVal.split(',')[0]}`, fare: transitFareTotal, currency };
+                    if (!state.icCards[state.activeUser]) {
+                        state.icCards[state.activeUser] = { JPY: 2000, MYR: 50, CNY: 100, logs: [] };
+                    }
+                    state.icCards[state.activeUser][currency] = Math.max(0, (state.icCards[state.activeUser][currency] || 0) - transitFareTotal);
+                    state.icCards[state.activeUser].logs.push(log);
+                    saveICCardsToStorage();
+                    updateIcEstimator();
+                    showToast("🚇 Fares Charged", `Deducted ${symbol}${transitFareTotal.toFixed(2)} from ${state.activeUser}'s transit balance.`);
+                });
+            }
+
+            // Charge grab fare listener
+            const chargeGrabBtn = document.getElementById("charge-grab-wallet-btn");
+            if (chargeGrabBtn) {
+                chargeGrabBtn.addEventListener("click", () => {
+                    const exp = {
+                        id: `exp-${Date.now()}`,
+                        title: `Grab Ride: ${startVal.split(',')[0]} ➔ ${endVal.split(',')[0]}`,
+                        amount: taxiFare,
+                        currency,
+                        payer: state.activeUser,
+                        category: "Transport",
+                        type: "global",
+                        date: new Date().toLocaleDateString()
+                    };
+                    state.expenses.push(exp);
+                    saveExpensesToStorage();
+                    renderLedger();
+                    renderDebtSettlement();
+                    updateIcEstimator();
+                    showToast("🚗 Taxi Fare Logged", `Recorded ride-hailing expense in group ledger.`);
+                });
+            }
         });
 
         function calculateShenzhenDidi(start, end) {
