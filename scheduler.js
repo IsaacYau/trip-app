@@ -3741,6 +3741,11 @@ if (typeof document !== 'undefined') {
             const transitHkd = convertToHkd(transitFareTotal, currency).toFixed(2);
             const taxiHkd = convertToHkd(taxiFare, currency).toFixed(2);
 
+            const formattedStart = addMinutesToTime(travelTime, 0);
+            const taxiArrival = addMinutesToTime(travelTime, taxiTime);
+            const bikeArrival = addMinutesToTime(travelTime, bikeTime);
+            const walkArrival = addMinutesToTime(travelTime, walkTime);
+
             const transitBadgeHtml = (startStationName === endStationName) ?
                 `<button class="btn btn-sm btn-secondary profile-btn" data-mode="transit">🚇 Transit (N/A)</button>` :
                 `<button class="btn btn-sm btn-accent profile-btn" data-mode="transit">🚇 Transit (${transitTimeTotal}m • ${symbol}${transitFareTotal.toFixed(1)})</button>`;
@@ -3757,9 +3762,9 @@ if (typeof document !== 'undefined') {
             transitResultsBody.innerHTML = `
                 <div class="route-profiles" style="display: flex; gap: 0.4rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.4rem;">
                     ${transitBadgeHtml}
-                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-secondary" : "btn-secondary"} profile-btn" data-mode="taxi">🚗 Ride (${taxiTime}m • ${symbol}${taxiFare.toFixed(0)})</button>
-                    <button class="btn btn-sm btn-secondary profile-btn" data-mode="cycling">🚴 Bike (${bikeTime}m)</button>
-                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-accent" : "btn-secondary"} profile-btn" data-mode="walking">🚶 Walk (${walkTime}m)</button>
+                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-secondary" : "btn-secondary"} profile-btn" data-mode="taxi">🚗 Ride (${taxiTime}m • Arr: ${taxiArrival})</button>
+                    <button class="btn btn-sm btn-secondary profile-btn" data-mode="cycling">🚴 Bike (${bikeTime}m • Arr: ${bikeArrival})</button>
+                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-accent" : "btn-secondary"} profile-btn" data-mode="walking">🚶 Walk (${walkTime}m • Arr: ${walkArrival})</button>
                 </div>
 
                 <div id="mode-transit-content" class="mode-content-panel" style="${(startStationName === endStationName) ? "display:none;" : ""}">
@@ -3774,6 +3779,7 @@ if (typeof document !== 'undefined') {
                     </div>
                     <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
                         <div>Est. Duration: <strong>${taxiTime} mins</strong></div>
+                        <div>Est. Arrival: <strong>${taxiArrival}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(Depart: ${formattedStart})</span></div>
                         <div>Est. Distance: <strong>${taxiDist.toFixed(2)} km</strong></div>
                         <div>Est. Fare: <strong>${symbol}${taxiFare.toFixed(2)}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${taxiHkd})</span></div>
                     </div>
@@ -3787,6 +3793,7 @@ if (typeof document !== 'undefined') {
                     </div>
                     <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
                         <div>Est. Cycling Time: <strong>${bikeTime} mins</strong></div>
+                        <div>Est. Arrival: <strong>${bikeArrival}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(Depart: ${formattedStart})</span></div>
                         <div>Est. Distance: <strong>${bikeDist.toFixed(2)} km</strong></div>
                         <div>Cost: <strong>Free (${symbol}0)</strong></div>
                     </div>
@@ -3799,6 +3806,7 @@ if (typeof document !== 'undefined') {
                     </div>
                     <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
                         <div>Est. Walking Time: <strong>${walkTime} mins</strong></div>
+                        <div>Est. Arrival: <strong>${walkArrival}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(Depart: ${formattedStart})</span></div>
                         <div>Est. Distance: <strong>${walkDist.toFixed(2)} km</strong></div>
                         <div>Cost: <strong>Free (${symbol}0)</strong></div>
                     </div>
