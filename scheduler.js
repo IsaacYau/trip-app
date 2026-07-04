@@ -404,31 +404,44 @@ async function fetchCoordinates(query, limit = 1) {
 // OSRM Routing service (100% Free for walking/cycling/driving)
 async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     if (!startCoord || !endCoord) return null;
-    try {
-        let url = "";
-        const isTestEnv = (typeof state === 'undefined');
-        if (mode === "foot" && !isTestEnv) {
-            url = `https://routing.openstreetmap.de/routed-foot/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`;
-        } else if (mode === "bicycle" && !isTestEnv) {
-            url = `https://routing.openstreetmap.de/routed-bike/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`;
-        } else {
-            url = `https://router.project-osrm.org/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`;
+    const isTestEnv = (typeof state === 'undefined');
+    
+    async function queryUrl(url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) return null;
+            const data = await response.json();
+            if (data && data.routes && data.routes.length > 0) {
+                const route = data.routes[0];
+                return {
+                    coordinates: route.geometry.coordinates.map(c => [c[1], c[0]]), // Mapbox [lon, lat] -> Leaflet [lat, lon]
+                    duration: Math.round(route.duration / 60), // convert seconds to minutes
+                    distance: parseFloat((route.distance / 1000).toFixed(2)) // convert meters to km
+                };
+            }
+        } catch (e) {
+            console.error("OSRM fetch error", e);
         }
-        const response = await fetch(url);
-        if (!response.ok) return null;
-        const data = await response.json();
-        if (data && data.routes && data.routes.length > 0) {
-            const route = data.routes[0];
-            return {
-                coordinates: route.geometry.coordinates.map(c => [c[1], c[0]]), // Mapbox [lon, lat] -> Leaflet [lat, lon]
-                duration: Math.round(route.duration / 60), // convert seconds to minutes
-                distance: parseFloat((route.distance / 1000).toFixed(2)) // convert meters to km
-            };
-        }
-    } catch (e) {
-        console.error("OSRM routing failed", e);
+        return null;
     }
-    return null;
+
+    if (isTestEnv) {
+        return queryUrl(`https://router.project-osrm.org/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+    }
+
+    if (mode === "foot") {
+        let res = await queryUrl(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+        if (res) return res;
+        return queryUrl(`https://routing.openstreetmap.de/routed-foot/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+    } else if (mode === "bicycle") {
+        let res = await queryUrl(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+        if (res) return res;
+        res = await queryUrl(`https://routing.openstreetmap.de/routed-bike/route/v1/bike/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+        if (res) return res;
+        return queryUrl(`https://routing.openstreetmap.de/routed-bike/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+    } else {
+        return queryUrl(`https://router.project-osrm.org/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+    }
 }
 
 // Pure Debt Settlement Splitter — supports dynamic group members and custom splitAmong/splitRatios
