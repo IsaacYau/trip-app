@@ -3750,10 +3750,6 @@ if (typeof document !== 'undefined') {
                 transitMapObj.fitBounds(group.getBounds().pad(0.1));
             }
 
-            // Render initial view (default to walking or ride if transit is blocked, otherwise transit)
-            const initialMode = (startStationName === endStationName) ? "walking" : "transit";
-            renderProfileOnMap(initialMode);
-
             const transitHkd = convertToHkd(transitFareTotal, currency).toFixed(2);
             const taxiHkd = convertToHkd(taxiFare, currency).toFixed(2);
 
@@ -3763,9 +3759,37 @@ if (typeof document !== 'undefined') {
             const bikeArrival = addMinutesToTime(travelTime, bikeTime);
             const walkArrival = addMinutesToTime(travelTime, walkTime);
 
+            // Determine the Recommended Mode based on criteria
+            const modesList = [];
+            if (route && !route.shutdown && startStationName !== endStationName) {
+                modesList.push({ mode: "transit", time: transitTimeTotal, costHkd: parseFloat(transitHkd) });
+            }
+            modesList.push({ mode: "taxi", time: taxiTime, costHkd: parseFloat(taxiHkd) });
+            modesList.push({ mode: "cycling", time: bikeTime, costHkd: 0 });
+            modesList.push({ mode: "walking", time: walkTime, costHkd: 0 });
+
+            modesList.forEach(m => {
+                if (crit === "time") {
+                    m.score = m.time + m.costHkd * 0.01;
+                } else if (crit === "fare") {
+                    m.score = m.costHkd + m.time * 0.01;
+                } else {
+                    m.score = m.time + m.costHkd * 2.0; // 1 HKD is worth 2 minutes of travel comfort
+                }
+            });
+            modesList.sort((a, b) => a.score - b.score);
+            const bestMode = modesList[0].mode;
+
+            // Render initial map view
+            renderProfileOnMap(bestMode);
+
             const transitBadgeHtml = (startStationName === endStationName) ?
                 `<button class="btn btn-sm btn-secondary profile-btn" data-mode="transit">🚇 Transit (N/A)</button>` :
-                `<button class="btn btn-sm btn-accent profile-btn" data-mode="transit">🚇 Transit (${symbol}${transitFareTotal.toFixed(1)} • Arr: ${transitArrival})</button>`;
+                `<button class="btn btn-sm ${bestMode === 'transit' ? 'btn-accent' : 'btn-secondary'} profile-btn" data-mode="transit">🚇 Transit ${bestMode === 'transit' ? '⭐' : ''} (${symbol}${transitFareTotal.toFixed(1)} • Arr: ${transitArrival})</button>`;
+
+            const rideBadgeHtml = `<button class="btn btn-sm ${bestMode === 'taxi' ? 'btn-accent' : 'btn-secondary'} profile-btn" data-mode="taxi">🚗 Ride ${bestMode === 'taxi' ? '⭐' : ''} (${symbol}${taxiFare.toFixed(0)} • Arr: ${taxiArrival})</button>`;
+            const bikeBadgeHtml = `<button class="btn btn-sm ${bestMode === 'cycling' ? 'btn-accent' : 'btn-secondary'} profile-btn" data-mode="cycling">🚴 Bike ${bestMode === 'cycling' ? '⭐' : ''} (Arr: ${bikeArrival})</button>`;
+            const walkBadgeHtml = `<button class="btn btn-sm ${bestMode === 'walking' ? 'btn-accent' : 'btn-secondary'} profile-btn" data-mode="walking">🚶 Walk ${bestMode === 'walking' ? '⭐' : ''} (Arr: ${walkArrival})</button>`;
 
             const transitMetricsHtml = (startStationName === endStationName) ? "" : `
                 <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
@@ -3779,12 +3803,12 @@ if (typeof document !== 'undefined') {
             transitResultsBody.innerHTML = `
                 <div class="route-profiles" style="display: flex; gap: 0.4rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.4rem;">
                     ${transitBadgeHtml}
-                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-secondary" : "btn-secondary"} profile-btn" data-mode="taxi">🚗 Ride (${symbol}${taxiFare.toFixed(0)} • Arr: ${taxiArrival})</button>
-                    <button class="btn btn-sm btn-secondary profile-btn" data-mode="cycling">🚴 Bike (Arr: ${bikeArrival})</button>
-                    <button class="btn btn-sm ${(startStationName === endStationName) ? "btn-accent" : "btn-secondary"} profile-btn" data-mode="walking">🚶 Walk (Arr: ${walkArrival})</button>
+                    ${rideBadgeHtml}
+                    ${bikeBadgeHtml}
+                    ${walkBadgeHtml}
                 </div>
 
-                <div id="mode-transit-content" class="mode-content-panel" style="${(startStationName === endStationName) ? "display:none;" : ""}">
+                <div id="mode-transit-content" class="mode-content-panel" style="${bestMode === 'transit' ? '' : 'display:none;'}">
                     ${transitTimelineHtml}
                     ${transitMetricsHtml}
                 </div>
