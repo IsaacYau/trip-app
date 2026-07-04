@@ -19,27 +19,18 @@ const MIME_TYPES = {
     '.zip': 'application/zip'
 };
 
-function fetchExternal(targetUrl) {
-    return new Promise((resolve, reject) => {
-        https.get(targetUrl, {
-            headers: {
-                'User-Agent': 'RoamReadyBackendProxy/1.0',
-                'Accept': 'application/json'
-            }
-        }, (res) => {
-            let body = '';
-            res.on('data', chunk => body += chunk);
-            res.on('end', () => {
-                if (res.statusCode >= 200 && res.statusCode < 300) {
-                    resolve({ status: res.statusCode, data: body });
-                } else {
-                    reject(new Error(`HTTP ${res.statusCode}: ${body}`));
-                }
-            });
-        }).on('error', (err) => {
-            reject(err);
-        });
+async function fetchExternal(targetUrl) {
+    const response = await fetch(targetUrl, {
+        headers: {
+            'User-Agent': 'RoamReadyBackendProxy/1.0',
+            'Accept': 'application/json'
+        }
     });
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const data = await response.text();
+    return { status: response.status, data };
 }
 
 const server = http.createServer(async (req, res) => {

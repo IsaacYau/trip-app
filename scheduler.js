@@ -168,6 +168,10 @@ function findDijkstraRoute(destination, start, end, criteria, travelDate, travel
     if (travelTime) {
         const [h, m] = travelTime.split(':').map(Number);
         const mins = h * 60 + m;
+        // Midnight Shutdown: 12:00 AM to 5:00 AM (0 to 300 mins)
+        if (mins >= 0 && mins < 300) {
+            return { shutdown: true };
+        }
         if (isWeekend) {
             // Weekend Peak: 11:30 - 15:30 (690 to 930 mins) and 17:30 - 20:00 (1050 to 1200 mins)
             if ((mins >= 690 && mins <= 930) || (mins >= 1050 && mins <= 1200)) {
@@ -3491,9 +3495,9 @@ if (typeof document !== 'undefined') {
             endMarker.bindPopup(`<b>Destination:</b> ${endVal}`);
 
             // Pre-calculate Transit legs
-            let transitTimeTotal = route ? route.totalTime : 0;
-            let transitFareTotal = route ? route.totalFare : 0;
-            let transitTransfers = route ? route.transfers : 0;
+            let transitTimeTotal = (route && !route.shutdown) ? route.totalTime : 0;
+            let transitFareTotal = (route && !route.shutdown) ? route.totalFare : 0;
+            let transitTransfers = (route && !route.shutdown) ? route.transfers : 0;
             let transitTimelineHtml = "";
 
             const startStationCoords = network.coordinates[startStationName];
@@ -3502,7 +3506,29 @@ if (typeof document !== 'undefined') {
             let endWalkCoords = [];
             let transitPathCoords = [];
 
-            if (startStationName === endStationName) {
+            function addMinutesToTime(timeStr, minsToAdd) {
+                const [h, m] = timeStr.split(':').map(Number);
+                let total = h * 60 + m + minsToAdd;
+                let newH = Math.floor(total / 60) % 24;
+                let newM = Math.floor(total % 60);
+                const ampm = newH >= 12 ? 'PM' : 'AM';
+                const displayH = newH % 12 === 0 ? 12 : newH % 12;
+                const displayM = String(newM).padStart(2, '0');
+                return `${displayH}:${displayM} ${ampm}`;
+            }
+
+            if (route && route.shutdown) {
+                transitTimelineHtml = `
+                    <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 1.2rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-primary); text-align: center; margin-bottom: 1rem; backdrop-filter: blur(8px);">
+                        <i data-lucide="moon" style="color: var(--accent); width: 28px; height: 28px; margin-bottom: 0.5rem; display: inline-block;"></i>
+                        <p style="font-weight: 700; margin-bottom: 0.25rem;">Transit System Closed (Midnight Shutdown)</p>
+                        <p style="color: var(--text-secondary); line-height: 1.4;">Trains and buses do not operate between <strong>12:00 AM and 5:00 AM</strong>. Walking, cycling, or ride-hailing is recommended for this travel slot.</p>
+                    </div>
+                `;
+                transitTimeTotal = 0;
+                transitFareTotal = 0;
+                transitTransfers = 0;
+            } else if (startStationName === endStationName) {
                 transitTimelineHtml = `
                     <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 1.2rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-primary); text-align: center; margin-bottom: 1rem; backdrop-filter: blur(8px);">
                         <i data-lucide="info" style="color: var(--accent); width: 28px; height: 28px; margin-bottom: 0.5rem; display: inline-block;"></i>
@@ -3515,14 +3541,25 @@ if (typeof document !== 'undefined') {
                 transitTransfers = 0;
             } else {
                 transitTimelineHtml = `<div class="route-timeline">`;
+                let currentMins = 0;
+                const schedKey = travelDate === "Weekend" ? "weekend" : "weekday";
+                const intervalMultiplier = 1;
+
+                // 1. Walk to start station
                 if (distToStartStation > 0.05) {
                     const walkPath = await fetchOsrmRoute(startLocCoords, startStationCoords, "foot");
                     if (walkPath) {
                         startWalkCoords = walkPath.coordinates;
                         const segmentWalkTime = Math.max(1, Math.round(walkPath.distance * 12));
+                        
+                        const depTime = addMinutesToTime(travelTime, currentMins);
+                        const arrTime = addMinutesToTime(travelTime, currentMins + segmentWalkTime);
+                        currentMins += segmentWalkTime;
                         transitTimeTotal += segmentWalkTime;
+
                         transitTimelineHtml += `
                             <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                                <div style="font-size:0.65rem; color:var(--text-secondary); font-weight:600;">${depTime} - ${arrTime}</div>
                                 <span class="node-station">🚶 Walk to ${startStationName}</span>
                                 <div class="node-detail">${segmentWalkTime}m • ${walkPath.distance}km</div>
                             </div>
@@ -3530,13 +3567,23 @@ if (typeof document !== 'undefined') {
                     }
                 }
 
+                // Wait for the first boarding
+                const firstLink = route ? route.segmentLinks[0] : null;
+                const baseInterval = firstLink?.schedule ? (firstLink.schedule[schedKey] || 10) : 10;
+                const waitTime = Math.round((baseInterval * intervalMultiplier) / 2);
+                
+                const waitDepTime = addMinutesToTime(travelTime, currentMins);
+                const trainDepTime = addMinutesToTime(travelTime, currentMins + waitTime);
+                currentMins += waitTime;
+                transitTimeTotal += waitTime;
+
                 transitTimelineHtml += `
                     <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                        <div style="font-size:0.65rem; color:var(--text-secondary); font-weight:600;">Departs at ${trainDepTime} (Wait: ${waitTime}m)</div>
                         <span class="node-station">🚉 Board at ${startStationName}</span>
                     </div>
                 `;
 
-                transitPathCoords = [];
                 if (route) {
                     for (let i = 0; i < route.segmentLinks.length; i++) {
                         const link = route.segmentLinks[i];
@@ -3545,34 +3592,69 @@ if (typeof document !== 'undefined') {
                         const vCoords = network.coordinates[nextStation];
 
                         transitPathCoords.push({ coords: [[uCoords.lat, uCoords.lon], [vCoords.lat, vCoords.lon]], color: link.color });
+                        
+                        const dep = addMinutesToTime(travelTime, currentMins);
+                        const arr = addMinutesToTime(travelTime, currentMins + link.time);
+                        currentMins += link.time;
+
                         const isTransfer = i > 0 && route.segmentLinks[i - 1].line !== link.line;
+                        const vehicleIcon = link.type === "bus" ? "🚌 Bus" : "🚄 Train";
+
                         transitTimelineHtml += `
                             <div class="timeline-node ${isTransfer ? "transfer" : ""}" style="border-left: 3px solid ${link.color}; padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                                <div style="font-size:0.65rem; color:var(--text-secondary); font-weight:600;">${dep} - ${arr}</div>
                                 <span class="node-station">${nextStation}</span>
-                                <span class="node-line" style="background-color:${link.color}; color:#fff; padding:2px 6px; font-size:0.65rem; font-weight:700; border-radius:3px;">${link.line}</span>
+                                <span class="node-line" style="background-color:${link.color}; color:#fff; padding:2px 6px; font-size:0.65rem; font-weight:700; border-radius:3px;">${vehicleIcon}: ${link.line}</span>
                                 <div class="node-detail">${link.time}m • ${symbol}${link.fare}</div>
                             </div>
                         `;
+
+                        // If transfer, add wait time for next line
+                        if (i < route.segmentLinks.length - 1) {
+                            const nextLink = route.segmentLinks[i + 1];
+                            if (nextLink.line !== link.line) {
+                                const nextInterval = nextLink.schedule ? (nextLink.schedule[schedKey] || 10) : 10;
+                                const transferWait = Math.round((nextInterval * intervalMultiplier) / 2);
+                                
+                                const transferDep = addMinutesToTime(travelTime, currentMins);
+                                const transferArr = addMinutesToTime(travelTime, currentMins + transferWait);
+                                currentMins += transferWait;
+                                transitTimeTotal += transferWait;
+
+                                transitTimelineHtml += `
+                                    <div class="timeline-node transfer" style="border-left: 3px dashed var(--accent); padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                                        <div style="font-size:0.65rem; color:var(--text-secondary); font-weight:600;">Wait ${transferWait}m (Next departs at ${transferArr})</div>
+                                        <span class="node-station">🔄 Transfer to ${nextLink.line}</span>
+                                    </div>
+                                `;
+                            }
+                        }
                     }
                 }
 
                 transitTimelineHtml += `
                     <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                        <div style="font-size:0.65rem; color:var(--text-secondary); font-weight:600;">Arrived at ${addMinutesToTime(travelTime, currentMins)}</div>
                         <span class="node-station">🏁 Exit at ${endStationName}</span>
                     </div>
                 `;
 
                 const endStationCoords = network.coordinates[endStationName];
                 const distToEndStation = getHaversineDistance(endStationCoords.lat, endStationCoords.lon, endLocCoords.lat, endLocCoords.lon);
-                endWalkCoords = [];
                 if (distToEndStation > 0.05) {
                     const walkPath = await fetchOsrmRoute(endStationCoords, endLocCoords, "foot");
                     if (walkPath) {
                         endWalkCoords = walkPath.coordinates;
                         const segmentWalkTime = Math.max(1, Math.round(walkPath.distance * 12));
+                        
+                        const walkDep = addMinutesToTime(travelTime, currentMins);
+                        const walkArr = addMinutesToTime(travelTime, currentMins + segmentWalkTime);
+                        currentMins += segmentWalkTime;
                         transitTimeTotal += segmentWalkTime;
+
                         transitTimelineHtml += `
                             <div class="timeline-node" style="border-left: 3px dashed #3182ce; padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                                <div style="font-size:0.65rem; color:var(--text-secondary); font-weight:600;">${walkDep} - ${walkArr}</div>
                                 <span class="node-station">🚶 Walk to destination</span>
                                 <div class="node-detail">${segmentWalkTime}m • ${walkPath.distance}km</div>
                             </div>
