@@ -467,7 +467,7 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
 
     if (mode === "foot") {
         // Try BRouter trekking first for authentic pedestrian routing!
-        const brouterUrl = `https://brouter.de/brouter?lon1=${startCoord.lon}&lat1=${startCoord.lat}&lon2=${endCoord.lon}&lat2=${endCoord.lat}&profile=trekking&alternativeidx=0&format=geojson`;
+        const brouterUrl = `https://brouter.de/brouter?lonlats=${startCoord.lon},${startCoord.lat}|${endCoord.lon},${endCoord.lat}&profile=trekking&alternativeidx=0&format=geojson`;
         let res = await queryUrl(brouterUrl);
         if (res) return res;
 
@@ -477,7 +477,7 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
         return queryUrl(`https://routing.openstreetmap.de/routed-foot/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
     } else if (mode === "bicycle") {
         // Try BRouter bicycle profile
-        const brouterUrl = `https://brouter.de/brouter?lon1=${startCoord.lon}&lat1=${startCoord.lat}&lon2=${endCoord.lon}&lat2=${endCoord.lat}&profile=bicycle&alternativeidx=0&format=geojson`;
+        const brouterUrl = `https://brouter.de/brouter?lonlats=${startCoord.lon},${startCoord.lat}|${endCoord.lon},${endCoord.lat}&profile=bicycle&alternativeidx=0&format=geojson`;
         let res = await queryUrl(brouterUrl);
         if (res) return res;
 
