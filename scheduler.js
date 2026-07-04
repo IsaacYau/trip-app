@@ -3459,11 +3459,27 @@ if (typeof document !== 'undefined') {
                 return;
             }
 
-            // Dijkstra routing
+            // Dijkstra routing for all three criteria
             const crit = transitCriteria.value;
             const travelDate = transitTravelDate ? transitTravelDate.value : getTodayTripDay();
             const travelTime = document.getElementById("transit-travel-time") ? document.getElementById("transit-travel-time").value : "12:00";
-            const route = findDijkstraRoute(state.destination, startStationName, endStationName, crit, travelDate, travelTime);
+            
+            const routeFastest = findDijkstraRoute(state.destination, startStationName, endStationName, "time", travelDate, travelTime);
+            const routeCheapest = findDijkstraRoute(state.destination, startStationName, endStationName, "fare", travelDate, travelTime);
+            let routeBalanced = findDijkstraRoute(state.destination, startStationName, endStationName, "balanced", travelDate, travelTime);
+
+            if (routeFastest && routeCheapest && !routeFastest.shutdown && !routeCheapest.shutdown && routeFastest.path && routeCheapest.path) {
+                const pathF = routeFastest.path;
+                const pathC = routeCheapest.path;
+                const pathsMatch = pathF.length === pathC.length && pathF.every((v, i) => v === pathC[i]);
+                if (pathsMatch) {
+                    routeBalanced = routeFastest;
+                }
+            }
+
+            let route = routeBalanced;
+            if (crit === "time") route = routeFastest;
+            else if (crit === "fare") route = routeCheapest;
 
             // Fetch Walk, Cycle, and Drive routes in parallel for speed!
             const [fullWalk, fullBike, fullDrive] = await Promise.all([
