@@ -543,7 +543,90 @@ try {
     assert.strictEqual(osrmRoute.distance, 2.5);
     assert.strictEqual(JSON.stringify(osrmRoute.coordinates), JSON.stringify([[35.17091, 136.88153], [35.16979, 136.90827]]));
 
+    // -------------------------------------------------------------------------
+    // TEST 20: OpenRouteService & BRouter Routing Fallback
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 20] Testing OpenRouteService and BRouter/OSRM Cascading Fallbacks...");
+
+    let requestedUrls = [];
+    sandbox.fetch = async (url, options) => {
+        requestedUrls.push(url);
+        if (url.includes("openrouteservice.org")) {
+            return {
+                ok: true,
+                json: async () => ({
+                    features: [{
+                        geometry: {
+                            coordinates: [[136.88153, 35.17091], [136.90827, 35.16979]]
+                        },
+                        properties: {
+                            summary: {
+                                duration: 600, // 10 minutes
+                                distance: 2000 // 2 km
+                            }
+                        }
+                    }]
+                })
+            };
+        }
+        if (url.includes("brouter.de")) {
+            return {
+                ok: true,
+                json: async () => ({
+                    features: [{
+                        geometry: {
+                            coordinates: [[136.88153, 35.17091], [136.90827, 35.16979]]
+                        },
+                        properties: {
+                            "track-length": 2200,
+                            "total-time": 660
+                        }
+                    }]
+                })
+            };
+        }
+        if (url.includes("router.project-osrm.org")) {
+            return {
+                ok: true,
+                json: async () => ({
+                    routes: [{
+                        geometry: {
+                            coordinates: [[136.88153, 35.17091], [136.90827, 35.16979]]
+                        },
+                        duration: 300,
+                        distance: 2500
+                    }]
+                })
+            };
+        }
+        return { ok: false };
+    };
+
+    // Case 1: ORS Token configured
+    let store = { "ROAMREADY_ORS_KEY": "test_ors_token" };
+    sandbox.localStorage.getItem = (key) => store[key] || null;
+
+    requestedUrls = [];
+    const orsRoute = await fetchOsrmRoute({ lat: 35.17091, lon: 136.88153 }, { lat: 35.16979, lon: 136.90827 }, "foot");
+    assert.ok(orsRoute);
+    assert.ok(requestedUrls.some(u => u.includes("openrouteservice.org")));
+    assert.strictEqual(orsRoute.duration, 10); // 600 / 60
+    assert.strictEqual(orsRoute.distance, 2); // 2000 / 1000
+
+    // Case 2: No ORS Token, fall back to BRouter
+    store = {};
+    requestedUrls = [];
+    const brouterRoute = await fetchOsrmRoute({ lat: 35.17091, lon: 136.88153 }, { lat: 35.16979, lon: 136.90827 }, "foot");
+    assert.ok(brouterRoute);
+    assert.ok(requestedUrls.some(u => u.includes("brouter.de")));
+    assert.strictEqual(brouterRoute.duration, 11); // 660 / 60
+    assert.strictEqual(brouterRoute.distance, 2.2); // 2200 / 1000
+
+    // Restore original mock
     sandbox.fetch = originalFetch;
+    sandbox.localStorage.getItem = () => null;
+    console.log("✅ OpenRouteService & BRouter cascading fallbacks verified!");
+
     console.log("✅ Geocoding and routing helper parsing tests passed!");
 
 
