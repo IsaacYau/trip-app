@@ -7,4 +7,5 @@
 | task-05 | Implement GTFS parser script `build_transit_graph.py` | completed | Extracts stations, links, times, and schedules to JSON |
 | task-06 | Integrate Leaflet map container and geocoder inputs | completed | Update scheduler.html and scheduler.css layouts |
 | task-07 | Implement Dijkstra schedule-aware Dijkstra routing | completed | Refactor scheduler.js routing logic and OSRM walking path rendering |
-
+| task-08 | Brainstorm and design walking route CORS/API fix | completed | Explore options to replace Mapbox/CORS-blocked endpoints with zero-config fallbacks |
+| task-09 | Implement OpenRouteService and CORS walking route fix | pending | Execute tasks in YYYY-MM-DD-openrouteservice-setup.md |
