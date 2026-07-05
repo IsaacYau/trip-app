@@ -433,7 +433,7 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     async function queryUrl(url) {
         const hasAbort = (typeof AbortController !== 'undefined');
         const controller = hasAbort ? new AbortController() : null;
-        const timeoutId = controller ? setTimeout(() => controller.abort(), 2500) : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 10000) : null;
         try {
             const fetchOpts = controller ? { signal: controller.signal } : {};
             const response = await fetch(url, fetchOpts);
@@ -441,11 +441,22 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
             if (!response.ok) return null;
             const data = await response.json();
             
-            // Handle BRouter GeoJSON Format
+            // Handle BRouter & OpenRouteService GeoJSON Format
             if (data.features && data.features.length > 0) {
                 const route = data.features[0];
-                const trackLength = route.properties["track-length"] || route.properties["distance"] || 0;
-                const totalTime = route.properties["total-time"] || route.properties["duration"] || 0;
+                let trackLength = 0;
+                let totalTime = 0;
+                
+                if (route.properties && route.properties.summary) {
+                    // OpenRouteService format
+                    trackLength = route.properties.summary.distance || 0;
+                    totalTime = route.properties.summary.duration || 0;
+                } else if (route.properties) {
+                    // BRouter format
+                    trackLength = route.properties["track-length"] || route.properties["distance"] || 0;
+                    totalTime = route.properties["total-time"] || route.properties["duration"] || 0;
+                }
+                
                 return {
                     coordinates: route.geometry.coordinates.map(c => [c[1], c[0]]), // [lon, lat] -> [lat, lon]
                     duration: Math.round(totalTime / 60) || 1,
@@ -464,12 +475,22 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
             }
         } catch (e) {
             if (timeoutId) clearTimeout(timeoutId);
-            console.error("OSRM fetch error", e);
+            console.error("Route fetch error", e);
         }
         return null;
     }
 
     if (isTestEnv) {
+        const testOrsKey = (typeof localStorage !== 'undefined') ? localStorage.getItem("ROAMREADY_ORS_KEY") : "";
+        if (testOrsKey) {
+            let profile = "foot-walking";
+            if (mode === "bicycle") profile = "cycling-regular";
+            else if (mode === "driving") profile = "driving-car";
+            return queryUrl(`https://api.openrouteservice.org/v2/directions/${profile}?api_key=${testOrsKey}&start=${startCoord.lon},${startCoord.lat}&end=${endCoord.lon},${endCoord.lat}`);
+        }
+        const brouterUrl = `https://brouter.de/brouter?lonlats=${startCoord.lon},${startCoord.lat}|${endCoord.lon},${endCoord.lat}&profile=trekking&alternativeidx=0&format=geojson`;
+        let res = await queryUrl(brouterUrl);
+        if (res) return res;
         return queryUrl(`https://router.project-osrm.org/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
     }
 
@@ -481,15 +502,14 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
         if (res) return res;
     }
 
-    const mapboxKey = (typeof localStorage !== 'undefined') ? localStorage.getItem("ROAMREADY_MAPBOX_KEY") : "";
-    if (mapboxKey) {
-        let profile = "walking";
-        if (mode === "foot") profile = "walking";
-        else if (mode === "bicycle") profile = "cycling";
-        else profile = "driving";
+    const orsKey = (typeof localStorage !== 'undefined') ? localStorage.getItem("ROAMREADY_ORS_KEY") : "";
+    if (orsKey) {
+        let profile = "driving-car";
+        if (mode === "foot") profile = "foot-walking";
+        else if (mode === "bicycle") profile = "cycling-regular";
 
-        const mapboxUrl = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?geometries=geojson&overview=full&access_token=${mapboxKey}`;
-        let res = await queryUrl(mapboxUrl);
+        const orsUrl = `https://api.openrouteservice.org/v2/directions/${profile}?api_key=${orsKey}&start=${startCoord.lon},${startCoord.lat}&end=${endCoord.lon},${endCoord.lat}`;
+        let res = await queryUrl(orsUrl);
         if (res) return res;
     }
 
@@ -502,7 +522,14 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
         // Fallback to openstreetmap.de foot server
         res = await queryUrl(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
         if (res) return res;
-        return queryUrl(`https://routing.openstreetmap.de/routed-foot/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+        
+        // Fallback to OSRM driving with custom walking calculation (CORS-enabled)
+        res = await queryUrl(`https://router.project-osrm.org/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+        if (res) {
+            res.duration = Math.round((res.distance / 5.0) * 60) || 1; // 5 km/h
+            return res;
+        }
+        return null;
     } else if (mode === "bicycle") {
         // Try BRouter bicycle profile
         const brouterUrl = `https://brouter.de/brouter?lonlats=${startCoord.lon},${startCoord.lat}|${endCoord.lon},${endCoord.lat}&profile=bicycle&alternativeidx=0&format=geojson`;
@@ -511,9 +538,14 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
 
         res = await queryUrl(`https://routing.openstreetmap.de/routed-bike/route/v1/bicycle/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
         if (res) return res;
-        res = await queryUrl(`https://routing.openstreetmap.de/routed-bike/route/v1/bike/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
-        if (res) return res;
-        return queryUrl(`https://routing.openstreetmap.de/routed-bike/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+        
+        // Fallback to OSRM driving with custom cycling calculation (CORS-enabled)
+        res = await queryUrl(`https://router.project-osrm.org/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
+        if (res) {
+            res.duration = Math.round((res.distance / 15.0) * 60) || 1; // 15 km/h
+            return res;
+        }
+        return null;
     } else {
         return queryUrl(`https://router.project-osrm.org/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
     }
