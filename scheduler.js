@@ -1266,11 +1266,11 @@ if (typeof document !== 'undefined') {
         const transitResultsBody = document.getElementById("transit-results-body");
         const transitCardTitle = document.getElementById("transit-card-title");
         
-        const mapboxInput = document.getElementById("mapbox-api-key");
-        if (mapboxInput) {
-            mapboxInput.value = localStorage.getItem("ROAMREADY_MAPBOX_KEY") || "";
-            mapboxInput.addEventListener("input", (e) => {
-                localStorage.setItem("ROAMREADY_MAPBOX_KEY", e.target.value.trim());
+        const orsInput = document.getElementById("ors-api-key");
+        if (orsInput) {
+            orsInput.value = localStorage.getItem("ROAMREADY_ORS_KEY") || "";
+            orsInput.addEventListener("input", (e) => {
+                localStorage.setItem("ROAMREADY_ORS_KEY", e.target.value.trim());
             });
         }
         
