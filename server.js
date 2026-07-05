@@ -57,7 +57,7 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        const effectiveOrsKey = orsKey || process.env.ROAMREADY_ORS_KEY || "";
+        const effectiveOrsKey = orsKey || process.env.ROAMREADY_ORS_KEY || "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=";
         let targetUrl = "";
         
         if (effectiveOrsKey) {

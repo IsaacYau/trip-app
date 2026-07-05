@@ -497,13 +497,13 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     // 1. If served from http/https server, route through local backend proxy to bypass CORS checks
     const isHttp = (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http'));
     if (isHttp) {
-        const localOrsKey = (typeof localStorage !== 'undefined') ? localStorage.getItem("ROAMREADY_ORS_KEY") || "" : "";
+        const localOrsKey = (typeof localStorage !== 'undefined') ? (localStorage.getItem("ROAMREADY_ORS_KEY") || "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=") : "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=";
         const proxyUrl = `/api/route?mode=${mode}&startLon=${startCoord.lon}&startLat=${startCoord.lat}&endLon=${endCoord.lon}&endLat=${endCoord.lat}${localOrsKey ? `&orsKey=${encodeURIComponent(localOrsKey)}` : ""}`;
         let res = await queryUrl(proxyUrl);
         if (res) return res;
     }
 
-    const orsKey = (typeof localStorage !== 'undefined') ? localStorage.getItem("ROAMREADY_ORS_KEY") : "";
+    const orsKey = (typeof localStorage !== 'undefined') ? (localStorage.getItem("ROAMREADY_ORS_KEY") || "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=") : "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=";
     if (orsKey) {
         let profile = "driving-car";
         if (mode === "foot") profile = "foot-walking";
@@ -1267,13 +1267,6 @@ if (typeof document !== 'undefined') {
         const transitResultsBody = document.getElementById("transit-results-body");
         const transitCardTitle = document.getElementById("transit-card-title");
         
-        const orsInput = document.getElementById("ors-api-key");
-        if (orsInput) {
-            orsInput.value = localStorage.getItem("ROAMREADY_ORS_KEY") || "";
-            orsInput.addEventListener("input", (e) => {
-                localStorage.setItem("ROAMREADY_ORS_KEY", e.target.value.trim());
-            });
-        }
         
         // Places
         const placesSearch = document.getElementById("places-search");
