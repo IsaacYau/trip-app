@@ -497,7 +497,8 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     // 1. If served from http/https server, route through local backend proxy to bypass CORS checks
     const isHttp = (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http'));
     if (isHttp) {
-        const proxyUrl = `/api/route?mode=${mode}&startLon=${startCoord.lon}&startLat=${startCoord.lat}&endLon=${endCoord.lon}&endLat=${endCoord.lat}`;
+        const localOrsKey = (typeof localStorage !== 'undefined') ? localStorage.getItem("ROAMREADY_ORS_KEY") || "" : "";
+        const proxyUrl = `/api/route?mode=${mode}&startLon=${startCoord.lon}&startLat=${startCoord.lat}&endLon=${endCoord.lon}&endLat=${endCoord.lat}${localOrsKey ? `&orsKey=${encodeURIComponent(localOrsKey)}` : ""}`;
         let res = await queryUrl(proxyUrl);
         if (res) return res;
     }

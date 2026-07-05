@@ -50,20 +50,29 @@ const server = http.createServer(async (req, res) => {
 
     // 1. API proxy route for coordinate directions
     if (pathname === '/api/route') {
-        const { mode, startLon, startLat, endLon, endLat } = parsedUrl.query;
+        const { mode, startLon, startLat, endLon, endLat, orsKey } = parsedUrl.query;
         if (!mode || !startLon || !startLat || !endLon || !endLat) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Missing parameters' }));
             return;
         }
 
+        const effectiveOrsKey = orsKey || process.env.ROAMREADY_ORS_KEY || "";
         let targetUrl = "";
-        if (mode === "foot") {
-            targetUrl = `https://brouter.de/brouter?lonlats=${startLon},${startLat}|${endLon},${endLat}&profile=trekking&alternativeidx=0&format=geojson`;
-        } else if (mode === "bicycle") {
-            targetUrl = `https://brouter.de/brouter?lonlats=${startLon},${startLat}|${endLon},${endLat}&profile=bicycle&alternativeidx=0&format=geojson`;
+        
+        if (effectiveOrsKey) {
+            let profile = "driving-car";
+            if (mode === "foot") profile = "foot-walking";
+            else if (mode === "bicycle") profile = "cycling-regular";
+            targetUrl = `https://api.openrouteservice.org/v2/directions/${profile}?api_key=${effectiveOrsKey}&start=${startLon},${startLat}&end=${endLon},${endLat}`;
         } else {
-            targetUrl = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
+            if (mode === "foot") {
+                targetUrl = `https://brouter.de/brouter?lonlats=${startLon},${startLat}|${endLon},${endLat}&profile=trekking&alternativeidx=0&format=geojson`;
+            } else if (mode === "bicycle") {
+                targetUrl = `https://brouter.de/brouter?lonlats=${startLon},${startLat}|${endLon},${endLat}&profile=bicycle&alternativeidx=0&format=geojson`;
+            } else {
+                targetUrl = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
+            }
         }
 
         try {
@@ -71,15 +80,29 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(result.data);
         } catch (e) {
-            console.error(`Proxy routing failed for ${mode}, falling back to OSRM:`, e.message);
+            console.error(`Proxy routing failed for ${mode}, falling back to OSRM/BRouter:`, e.message);
             try {
-                const fallbackUrl = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
+                // If ORS failed or key was wrong, let's fallback to BRouter if foot/bicycle, otherwise OSRM
+                let fallbackUrl = "";
+                if (mode === "foot" || mode === "bicycle") {
+                    fallbackUrl = `https://brouter.de/brouter?lonlats=${startLon},${startLat}|${endLon},${endLat}&profile=${mode === "foot" ? "trekking" : "bicycle"}&alternativeidx=0&format=geojson`;
+                } else {
+                    fallbackUrl = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
+                }
                 const result = await fetchExternal(fallbackUrl);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(result.data);
             } catch (fallbackErr) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Routing proxy failed', details: e.message }));
+                // Last resort: standard OSRM driving
+                try {
+                    const lastResortUrl = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
+                    const result = await fetchExternal(lastResortUrl);
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(result.data);
+                } catch (lastErr) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Routing proxy failed completely', details: e.message }));
+                }
             }
         }
         return;
