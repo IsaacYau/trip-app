@@ -14,4 +14,4 @@
 | task-09-04 | Integrate ORS in Server Proxy `server.js` | completed | Enable ORS forwarding and fallback handling in Node proxy |
 | task-10-01 | Add OpenTripPlanner parsing unit tests in `test.js` | completed | Write unit tests for decoding OTP response polyline geometries |
 | task-10-02 | Implement decodePolyline and OTP parser in `scheduler.js` | completed | Create polyline decoder and OTP response parsing client-side |
-| task-10-03 | Integrate OTP routing in Server Proxy `server.js` | in-progress | Add OTP forwarding requests and fallbacks to server proxy |
+| task-10-03 | Integrate OTP routing in Server Proxy `server.js` | completed | Add OTP forwarding requests and fallbacks to server proxy |
