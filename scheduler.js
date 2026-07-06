@@ -430,6 +430,35 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     if (!startCoord || !endCoord) return null;
     const isTestEnv = (typeof state === 'undefined');
     
+    function decodePolyline(str) {
+        let index = 0, lat = 0, lng = 0, coordinates = [], shift = 0, result = 0, byte = null, lat_change, lng_change;
+        while (index < str.length) {
+            byte = null;
+            shift = 0;
+            result = 0;
+            do {
+                byte = str.charCodeAt(index++) - 63;
+                result |= (byte & 0x1f) << shift;
+                shift += 5;
+            } while (byte >= 0x20);
+            lat_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+            lat += lat_change;
+
+            shift = 0;
+            result = 0;
+            do {
+                byte = str.charCodeAt(index++) - 63;
+                result |= (byte & 0x1f) << shift;
+                shift += 5;
+            } while (byte >= 0x20);
+            lng_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+            lng += lng_change;
+
+            coordinates.push([lat / 100000.0, lng / 100000.0]);
+        }
+        return coordinates;
+    }
+    
     async function queryUrl(url) {
         const hasAbort = (typeof AbortController !== 'undefined');
         const controller = hasAbort ? new AbortController() : null;
@@ -440,6 +469,23 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
             if (timeoutId) clearTimeout(timeoutId);
             if (!response.ok) return null;
             const data = await response.json();
+            
+            // Handle OpenTripPlanner Format
+            if (data.plan && data.plan.itineraries && data.plan.itineraries.length > 0) {
+                const itin = data.plan.itineraries[0];
+                let coords = [];
+                itin.legs.forEach(leg => {
+                    if (leg.legGeometry && leg.legGeometry.points) {
+                        const decoded = decodePolyline(leg.legGeometry.points);
+                        coords = coords.concat(decoded);
+                    }
+                });
+                return {
+                    coordinates: coords,
+                    duration: Math.round(itin.duration / 60) || 1,
+                    distance: parseFloat((itin.legs.reduce((sum, leg) => sum + leg.distance, 0) / 1000).toFixed(2)) || 0.1
+                };
+            }
             
             // Handle BRouter & OpenRouteService GeoJSON Format
             if (data.features && data.features.length > 0) {
@@ -481,6 +527,13 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     }
 
     if (isTestEnv) {
+        let otpMode = "WALK";
+        if (mode === "bicycle") otpMode = "BICYCLE";
+        else if (mode === "driving") otpMode = "CAR";
+        
+        let res = await queryUrl(`http://150.230.3.107:8080/otp/routers/default/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`);
+        if (res) return res;
+        
         const testOrsKey = (typeof localStorage !== 'undefined') ? localStorage.getItem("ROAMREADY_ORS_KEY") : "";
         if (testOrsKey) {
             let profile = "foot-walking";
@@ -489,7 +542,7 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
             return queryUrl(`https://api.openrouteservice.org/v2/directions/${profile}?api_key=${testOrsKey}&start=${startCoord.lon},${startCoord.lat}&end=${endCoord.lon},${endCoord.lat}`);
         }
         const brouterUrl = `https://brouter.de/brouter?lonlats=${startCoord.lon},${startCoord.lat}|${endCoord.lon},${endCoord.lat}&profile=trekking&alternativeidx=0&format=geojson`;
-        let res = await queryUrl(brouterUrl);
+        res = await queryUrl(brouterUrl);
         if (res) return res;
         return queryUrl(`https://router.project-osrm.org/route/v1/driving/${startCoord.lon},${startCoord.lat};${endCoord.lon},${endCoord.lat}?overview=full&geometries=geojson`);
     }
@@ -502,6 +555,13 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
         let res = await queryUrl(proxyUrl);
         if (res) return res;
     }
+
+    let otpMode = "WALK";
+    if (mode === "bicycle") otpMode = "BICYCLE";
+    else if (mode === "driving") otpMode = "CAR";
+    
+    let res = await queryUrl(`http://150.230.3.107:8080/otp/routers/default/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`);
+    if (res) return res;
 
     const orsKey = (typeof localStorage !== 'undefined') ? (localStorage.getItem("ROAMREADY_ORS_KEY") || "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=") : "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=";
     if (orsKey) {
