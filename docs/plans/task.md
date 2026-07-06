@@ -12,3 +12,6 @@
 | task-09-02 | Implement OpenRouteService client-side and timeout adjustments in `scheduler.js` | completed | Extend timeout to 10s and implement ORS client with fallbacks |
 | task-09-03 | Update UI in `scheduler.html` | completed | Replace Mapbox token UI fields with ORS API key fields |
 | task-09-04 | Integrate ORS in Server Proxy `server.js` | completed | Enable ORS forwarding and fallback handling in Node proxy |
+| task-10-01 | Add OpenTripPlanner parsing unit tests in `test.js` | pending | Write unit tests for decoding OTP response polyline geometries |
+| task-10-02 | Implement decodePolyline and OTP parser in `scheduler.js` | pending | Create polyline decoder and OTP response parsing client-side |
+| task-10-03 | Integrate OTP routing in Server Proxy `server.js` | pending | Add OTP forwarding requests and fallbacks to server proxy |
