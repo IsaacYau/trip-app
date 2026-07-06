@@ -627,6 +627,44 @@ try {
     sandbox.localStorage.getItem = () => null;
     console.log("✅ OpenRouteService & BRouter cascading fallbacks verified!");
 
+    // -------------------------------------------------------------------------
+    // TEST 21: OpenTripPlanner Routing Geometry Parsing
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 21] Testing OpenTripPlanner Response and Polyline Decoding...");
+
+    sandbox.fetch = async (url, options) => {
+        if (url.includes("150.230.3.107")) {
+            return {
+                ok: true,
+                json: async () => ({
+                    plan: {
+                        itineraries: [{
+                            duration: 3559,
+                            legs: [{
+                                mode: "WALK",
+                                distance: 4309.32,
+                                duration: 3559,
+                                legGeometry: {
+                                    points: "_g`C_a{jQaBvA"
+                                }
+                            }]
+                        }]
+                    }
+                })
+            };
+        }
+        return { ok: false };
+    };
+
+    const otpRoute = await fetchOsrmRoute({ lat: 3.1390, lon: 101.6869 }, { lat: 3.1578, lon: 101.7119 }, "foot");
+    assert.ok(otpRoute);
+    assert.strictEqual(otpRoute.duration, 59); // 3559s / 60
+    assert.strictEqual(otpRoute.distance, 4.31); // 4309.32m / 1000
+    assert.ok(otpRoute.coordinates.length > 0);
+
+    sandbox.fetch = originalFetch;
+    console.log("✅ OpenTripPlanner response parsing and decoding verified!");
+
     console.log("✅ Geocoding and routing helper parsing tests passed!");
 
 
