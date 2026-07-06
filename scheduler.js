@@ -425,6 +425,101 @@ async function fetchCoordinates(query, limit = 1) {
     return limit === 1 ? filteredMatches[0] : filteredMatches.slice(0, limit);
 }
 
+function calculateJapanTransitFare(itinerary) {
+    if (!itinerary || !itinerary.legs) return 0;
+    let totalFare = 0;
+    let currentAgency = null;
+
+    itinerary.legs.forEach(leg => {
+        if (leg.transitLeg && leg.route && leg.agencyName) {
+            const agency = leg.agencyName.toLowerCase();
+            const dist = (leg.distance || 0) / 1000;
+
+            if (currentAgency !== agency) {
+                currentAgency = agency;
+                if (agency.includes("osaka metro") || agency.includes("osaka市")) {
+                    totalFare += 190;
+                } else if (agency.includes("jr west") || agency.includes("jr") || agency.includes("west japan")) {
+                    totalFare += 140;
+                } else if (agency.includes("hankyu") || agency.includes("阪急")) {
+                    totalFare += 160;
+                } else if (agency.includes("meitetsu") || agency.includes("名古屋鉄道")) {
+                    totalFare += 170;
+                } else if (agency.includes("nagoya") || agency.includes("名古屋市")) {
+                    totalFare += 210;
+                } else if (agency.includes("kobe") || agency.includes("神戸")) {
+                    totalFare += 210;
+                } else {
+                    totalFare += 170;
+                }
+            }
+
+            if (agency.includes("osaka metro") || agency.includes("osaka市")) {
+                if (dist > 3 && dist <= 7) totalFare += 50;
+                else if (dist > 7 && dist <= 13) totalFare += 100;
+                else if (dist > 13) totalFare += 150;
+            } else if (agency.includes("jr west") || agency.includes("jr") || agency.includes("west japan")) {
+                if (dist > 3 && dist <= 6) totalFare += 30;
+                else if (dist > 6 && dist <= 10) totalFare += 70;
+                else if (dist > 10) totalFare += Math.round(dist - 10) * 15;
+            } else if (agency.includes("hankyu") || agency.includes("阪急")) {
+                if (dist > 4 && dist <= 9) totalFare += 40;
+                else if (dist > 9) totalFare += 80;
+            } else if (agency.includes("meitetsu") || agency.includes("名古屋鉄道")) {
+                if (dist > 3) totalFare += Math.round((dist - 3) * 15);
+            } else {
+                if (dist > 3) totalFare += Math.round((dist - 3) * 15);
+            }
+        }
+    });
+    return totalFare;
+}
+
+async function fetchOtpTransitRoute(startLocCoords, endLocCoords) {
+    try {
+        const url = `http://150.230.3.107:8080/otp/routers/default/plan?fromPlace=${startLocCoords.lat},${startLocCoords.lon}&toPlace=${endLocCoords.lat},${endLocCoords.lon}&mode=TRANSIT,WALK`;
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.plan && data.plan.itineraries && data.plan.itineraries.length > 0) {
+            const itin = data.plan.itineraries[0];
+            const fare = calculateJapanTransitFare(itin);
+            const segmentLinks = [];
+            let transfers = 0;
+            let lastLine = null;
+            
+            itin.legs.forEach(leg => {
+                if (leg.transitLeg) {
+                    segmentLinks.push({
+                        line: leg.route || leg.routeLongName || leg.routeShortName || "Train",
+                        color: leg.routeColor ? `#${leg.routeColor}` : "#3182ce",
+                        time: Math.round(leg.duration / 60) || 1,
+                        fare: 0,
+                        u: leg.from.name,
+                        v: leg.to.name,
+                        type: leg.mode.toLowerCase()
+                    });
+                    if (lastLine && lastLine !== leg.route) {
+                        transfers++;
+                    }
+                    lastLine = leg.route;
+                }
+            });
+
+            return {
+                totalTime: Math.round(itin.duration / 60) || 1,
+                totalFare: fare,
+                transfers,
+                segmentLinks,
+                itinerary: itin
+            };
+        }
+    } catch (e) {
+        console.error("OTP Transit Route fetch error", e);
+    }
+    return null;
+}
+
 // OSRM Routing service (100% Free for walking/cycling/driving)
 async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     if (!startCoord || !endCoord) return null;
@@ -3545,27 +3640,32 @@ if (typeof document !== 'undefined') {
                 return;
             }
 
-            // Dijkstra routing for all three criteria
+            // Dijkstra routing for all three criteria (or OTP for Japan)
             const crit = transitCriteria.value;
             const travelDate = transitTravelDate ? transitTravelDate.value : getTodayTripDay();
             const travelTime = document.getElementById("transit-travel-time") ? document.getElementById("transit-travel-time").value : "12:00";
             
-            const routeFastest = findDijkstraRoute(state.destination, startStationName, endStationName, "time", travelDate, travelTime);
-            const routeCheapest = findDijkstraRoute(state.destination, startStationName, endStationName, "fare", travelDate, travelTime);
-            let routeBalanced = findDijkstraRoute(state.destination, startStationName, endStationName, "balanced", travelDate, travelTime);
+            let route;
+            if (state.destination === "japan") {
+                route = await fetchOtpTransitRoute(startLocCoords, endLocCoords);
+            } else {
+                const routeFastest = findDijkstraRoute(state.destination, startStationName, endStationName, "time", travelDate, travelTime);
+                const routeCheapest = findDijkstraRoute(state.destination, startStationName, endStationName, "fare", travelDate, travelTime);
+                let routeBalanced = findDijkstraRoute(state.destination, startStationName, endStationName, "balanced", travelDate, travelTime);
 
-            if (routeFastest && routeCheapest && !routeFastest.shutdown && !routeCheapest.shutdown && routeFastest.path && routeCheapest.path) {
-                const pathF = routeFastest.path;
-                const pathC = routeCheapest.path;
-                const pathsMatch = pathF.length === pathC.length && pathF.every((v, i) => v === pathC[i]);
-                if (pathsMatch) {
-                    routeBalanced = routeFastest;
+                if (routeFastest && routeCheapest && !routeFastest.shutdown && !routeCheapest.shutdown && routeFastest.path && routeCheapest.path) {
+                    const pathF = routeFastest.path;
+                    const pathC = routeCheapest.path;
+                    const pathsMatch = pathF.length === pathC.length && pathF.every((v, i) => v === pathC[i]);
+                    if (pathsMatch) {
+                        routeBalanced = routeFastest;
+                    }
                 }
-            }
 
-            let route = routeBalanced;
-            if (crit === "time") route = routeFastest;
-            else if (crit === "fare") route = routeCheapest;
+                route = routeBalanced;
+                if (crit === "time") route = routeFastest;
+                else if (crit === "fare") route = routeCheapest;
+            }
 
             // Fetch Walk, Cycle, and Drive routes in parallel for speed!
             const [fullWalk, fullBike, fullDrive] = await Promise.all([
@@ -3636,6 +3736,67 @@ if (typeof document !== 'undefined') {
                 transitTimeTotal = 0;
                 transitFareTotal = 0;
                 transitTransfers = 0;
+            } else if (state.destination === "japan") {
+                if (!route || !route.itinerary) {
+                    transitTimelineHtml = `
+                        <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 1.2rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-primary); text-align: center; margin-bottom: 1rem; backdrop-filter: blur(8px);">
+                            <i data-lucide="info" style="color: var(--accent); width: 28px; height: 28px; margin-bottom: 0.5rem; display: inline-block;"></i>
+                            <p style="font-weight: 700; margin-bottom: 0.25rem;">No Transit Route Found</p>
+                            <p style="color: var(--text-secondary); line-height: 1.4;">OpenTripPlanner could not find a transit path. Try pure walking or cycling option.</p>
+                        </div>
+                    `;
+                    transitTimeTotal = 0;
+                    transitFareTotal = 0;
+                    transitTransfers = 0;
+                } else {
+                    transitTimelineHtml = `<div class="route-timeline">`;
+                    let currentMins = 0;
+                    
+                    transitTimelineHtml += `
+                        <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                            <div style="font-size:0.65rem; color:var(--text-secondary); font-weight:600;">Depart at ${travelTime || "12:00"}</div>
+                            <span class="node-station">🏁 Start: ${startVal.split(',')[0]}</span>
+                        </div>
+                    `;
+
+                    route.itinerary.legs.forEach(leg => {
+                        const legDuration = Math.round(leg.duration / 60) || 1;
+                        const legDepTime = addMinutesToTime(travelTime || "12:00", currentMins);
+                        currentMins += legDuration;
+                        const legArrTime = addMinutesToTime(travelTime || "12:00", currentMins);
+                        
+                        if (leg.mode === "WALK") {
+                            const dist = ((leg.distance || 0) / 1000).toFixed(2);
+                            transitTimelineHtml += `
+                                <div class="timeline-node" style="border-left: 3px dashed #718096; padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                                    <div style="font-size:0.65rem; color:var(--text-secondary); font-weight:600;">${legDepTime} - ${legArrTime} (${legDuration} mins)</div>
+                                    <span class="node-station">🚶 Walk to ${leg.to.name.split(',')[0]}</span>
+                                    <div class="node-detail">Distance: ${dist} km</div>
+                                </div>
+                            `;
+                        } else {
+                            const color = leg.routeColor ? `#${leg.routeColor}` : "#3182ce";
+                            const vehicleIcon = leg.mode.toLowerCase() === "bus" ? "🚌 Bus" : "🚄 Train";
+                            transitTimelineHtml += `
+                                <div class="timeline-node" style="border-left: 3px solid ${color}; padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                                    <div style="font-size:0.65rem; color:var(--text-secondary); font-weight:600;">${legDepTime} - ${legArrTime} (${legDuration} mins)</div>
+                                    <span class="node-station">${leg.from.name.split(',')[0]} ➔ ${leg.to.name.split(',')[0]}</span>
+                                    <span class="node-line" style="background-color:${color}; color:#fff; padding:2px 6px; font-size:0.65rem; font-weight:700; border-radius:3px;">${vehicleIcon}: ${leg.route || "Line"}</span>
+                                    <div class="node-detail">via ${leg.agencyName || "Transit"}</div>
+                                </div>
+                            `;
+                        }
+                    });
+
+                    transitTimelineHtml += `
+                        <div class="timeline-node" style="border-left: 3px solid var(--accent); padding-left: 1.2rem; margin-bottom: 0.75rem;">
+                            <div style="font-size:0.65rem; color:var(--text-secondary); font-weight:600;">Arrived at ${addMinutesToTime(travelTime || "12:00", currentMins)}</div>
+                            <span class="node-station">🏁 Destination: ${endVal.split(',')[0]}</span>
+                        </div>
+                    `;
+                    transitTimelineHtml += `</div>`;
+                    transitTimeTotal = currentMins;
+                }
             } else if (startStationName === endStationName) {
                 transitTimelineHtml = `
                     <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 1.2rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-primary); text-align: center; margin-bottom: 1rem; backdrop-filter: blur(8px);">
@@ -3811,16 +3972,29 @@ if (typeof document !== 'undefined') {
             function renderProfileOnMap(profile) {
                 transitPolylineGroup.clearLayers();
                 if (profile === "transit") {
-                    if (startStationName !== endStationName && route && route.path) {
-                        if (startWalkCoords.length > 0) L.polyline(startWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
-                        transitPathCoords.forEach(leg => {
-                            L.polyline(leg.coords, { color: leg.color || "#805ad5", weight: 6 }).addTo(transitPolylineGroup);
-                        });
-                        route.path.slice(1).forEach(station => {
-                            const sc = network.coordinates[station];
-                            L.circleMarker([sc.lat, sc.lon], { radius: 6, color: "#e53e3e", fillColor: "#ffffff", fillOpacity: 1, weight: 3 }).addTo(transitPolylineGroup).bindPopup(`<b>Station:</b> ${station}`);
-                        });
-                        if (endWalkCoords.length > 0) L.polyline(endWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
+                    if (state.destination === "japan") {
+                        if (route && route.itinerary && route.itinerary.legs) {
+                            route.itinerary.legs.forEach(leg => {
+                                if (leg.legGeometry && leg.legGeometry.points) {
+                                    const decoded = decodePolyline(leg.legGeometry.points);
+                                    const color = leg.mode === "WALK" ? "#718096" : (leg.routeColor ? `#${leg.routeColor}` : "#3182ce");
+                                    const dash = leg.mode === "WALK" ? "5, 10" : "";
+                                    L.polyline(decoded, { color: color, weight: leg.mode === "WALK" ? 4 : 6, dashArray: dash }).addTo(transitPolylineGroup);
+                                }
+                            });
+                        }
+                    } else {
+                        if (startStationName !== endStationName && route && route.path) {
+                            if (startWalkCoords.length > 0) L.polyline(startWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
+                            transitPathCoords.forEach(leg => {
+                                L.polyline(leg.coords, { color: leg.color || "#805ad5", weight: 6 }).addTo(transitPolylineGroup);
+                            });
+                            route.path.slice(1).forEach(station => {
+                                const sc = network.coordinates[station];
+                                L.circleMarker([sc.lat, sc.lon], { radius: 6, color: "#e53e3e", fillColor: "#ffffff", fillOpacity: 1, weight: 3 }).addTo(transitPolylineGroup).bindPopup(`<b>Station:</b> ${station}`);
+                            });
+                            if (endWalkCoords.length > 0) L.polyline(endWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
+                        }
                     }
                 } else if (profile === "taxi") {
                     const coords = fullDrive ? fullDrive.coordinates : [[startLocCoords.lat, startLocCoords.lon], [endLocCoords.lat, endLocCoords.lon]];
@@ -3846,8 +4020,10 @@ if (typeof document !== 'undefined') {
             const walkArrival = addMinutesToTime(travelTime, walkTime);
 
             // Determine the Recommended Mode based on criteria
+            const showTransitRoute = (state.destination === "japan" && route && route.itinerary) || (state.destination !== "japan" && startStationName !== endStationName && route && !route.shutdown);
+
             const modesList = [];
-            if (route && !route.shutdown && startStationName !== endStationName) {
+            if (showTransitRoute) {
                 modesList.push({ mode: "transit", time: transitTimeTotal, costHkd: parseFloat(transitHkd) });
             }
             modesList.push({ mode: "taxi", time: taxiTime, costHkd: parseFloat(taxiHkd) });
@@ -3869,19 +4045,29 @@ if (typeof document !== 'undefined') {
             // Render initial map view
             renderProfileOnMap(bestMode);
 
-            const transitBadgeHtml = (startStationName === endStationName) ?
+            const transitBadgeHtml = (!showTransitRoute) ?
                 `<button class="btn btn-sm btn-secondary profile-btn" data-mode="transit">🚇 Transit (N/A)</button>` :
-                `<button class="btn btn-sm ${bestMode === 'transit' ? 'btn-accent' : 'btn-secondary'} profile-btn" data-mode="transit">🚇 Transit ${bestMode === 'transit' ? '⭐' : ''} (${symbol}${transitFareTotal.toFixed(1)} • Arr: ${transitArrival})</button>`;
+                `<button class="btn btn-sm ${bestMode === 'transit' ? 'btn-accent' : 'btn-secondary'} profile-btn" data-mode="transit">🚇 Transit ${bestMode === 'transit' ? '⭐' : ''} (${symbol}${transitFareTotal.toFixed(0)} • Arr: ${transitArrival})</button>`;
 
             const rideBadgeHtml = `<button class="btn btn-sm ${bestMode === 'taxi' ? 'btn-accent' : 'btn-secondary'} profile-btn" data-mode="taxi">🚗 Ride ${bestMode === 'taxi' ? '⭐' : ''} (${symbol}${taxiFare.toFixed(0)} • Arr: ${taxiArrival})</button>`;
             const bikeBadgeHtml = `<button class="btn btn-sm ${bestMode === 'cycling' ? 'btn-accent' : 'btn-secondary'} profile-btn" data-mode="cycling">🚴 Bike ${bestMode === 'cycling' ? '⭐' : ''} (Arr: ${bikeArrival})</button>`;
             const walkBadgeHtml = `<button class="btn btn-sm ${bestMode === 'walking' ? 'btn-accent' : 'btn-secondary'} profile-btn" data-mode="walking">🚶 Walk ${bestMode === 'walking' ? '⭐' : ''} (Arr: ${walkArrival})</button>`;
 
-            const transitMetricsHtml = (startStationName === endStationName) ? "" : `
+            let disclaimerHtml = "";
+            if (state.destination === "japan") {
+                disclaimerHtml = `
+                    <div style="font-size:0.65rem; color:var(--text-secondary); margin-top:0.4rem; font-style:italic; line-height:1.2;">
+                        ⚠️ Note: Fare estimation is approximate based on standard distance tiers and operator transfer penalties.
+                    </div>
+                `;
+            }
+
+            const transitMetricsHtml = (!showTransitRoute) ? "" : `
                 <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
                     <div>Total Duration: <strong>${transitTimeTotal} mins</strong></div>
                     <div>Line Transfers: <strong>${transitTransfers}</strong></div>
-                    <div>Fare: <strong>${symbol}${transitFareTotal.toFixed(2)}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${transitHkd})</span></div>
+                    <div>Fare: <strong>${symbol}${transitFareTotal.toFixed(0)}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${transitHkd})</span></div>
+                    ${disclaimerHtml}
                 </div>
                 <button class="btn btn-accent btn-block" style="margin-top:0.8rem;" id="charge-ic-transit-btn"><i data-lucide="credit-card"></i> Add transit fare to ${state.activeUser}</button>
             `;
