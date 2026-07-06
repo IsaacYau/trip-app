@@ -57,34 +57,27 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        const effectiveOrsKey = orsKey || process.env.ROAMREADY_ORS_KEY || "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=";
-        let targetUrl = "";
-        
-        if (effectiveOrsKey) {
-            let profile = "driving-car";
-            if (mode === "foot") profile = "foot-walking";
-            else if (mode === "bicycle") profile = "cycling-regular";
-            targetUrl = `https://api.openrouteservice.org/v2/directions/${profile}?api_key=${effectiveOrsKey}&start=${startLon},${startLat}&end=${endLon},${endLat}`;
-        } else {
-            if (mode === "foot") {
-                targetUrl = `https://brouter.de/brouter?lonlats=${startLon},${startLat}|${endLon},${endLat}&profile=trekking&alternativeidx=0&format=geojson`;
-            } else if (mode === "bicycle") {
-                targetUrl = `https://brouter.de/brouter?lonlats=${startLon},${startLat}|${endLon},${endLat}&profile=bicycle&alternativeidx=0&format=geojson`;
-            } else {
-                targetUrl = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
-            }
-        }
+        let otpMode = "WALK";
+        if (mode === "bicycle") otpMode = "BICYCLE";
+        else if (mode === "driving") otpMode = "CAR";
+
+        const targetUrl = `http://150.230.3.107:8080/otp/routers/default/plan?fromPlace=${startLat},${startLon}&toPlace=${endLat},${endLon}&mode=${otpMode}`;
 
         try {
             const result = await fetchExternal(targetUrl);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(result.data);
         } catch (e) {
-            console.error(`Proxy routing failed for ${mode}, falling back to OSRM/BRouter:`, e.message);
+            console.error(`Proxy OTP routing failed for ${mode}, falling back to ORS/BRouter/OSRM:`, e.message);
             try {
-                // If ORS failed or key was wrong, let's fallback to BRouter if foot/bicycle, otherwise OSRM
+                const effectiveOrsKey = orsKey || process.env.ROAMREADY_ORS_KEY || "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=";
                 let fallbackUrl = "";
-                if (mode === "foot" || mode === "bicycle") {
+                if (effectiveOrsKey) {
+                    let profile = "driving-car";
+                    if (mode === "foot") profile = "foot-walking";
+                    else if (mode === "bicycle") profile = "cycling-regular";
+                    fallbackUrl = `https://api.openrouteservice.org/v2/directions/${profile}?api_key=${effectiveOrsKey}&start=${startLon},${startLat}&end=${endLon},${endLat}`;
+                } else if (mode === "foot" || mode === "bicycle") {
                     fallbackUrl = `https://brouter.de/brouter?lonlats=${startLon},${startLat}|${endLon},${endLat}&profile=${mode === "foot" ? "trekking" : "bicycle"}&alternativeidx=0&format=geojson`;
                 } else {
                     fallbackUrl = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
@@ -93,15 +86,26 @@ const server = http.createServer(async (req, res) => {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(result.data);
             } catch (fallbackErr) {
-                // Last resort: standard OSRM driving
                 try {
-                    const lastResortUrl = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
+                    let lastResortUrl = "";
+                    if (mode === "foot" || mode === "bicycle") {
+                        lastResortUrl = `https://brouter.de/brouter?lonlats=${startLon},${startLat}|${endLon},${endLat}&profile=${mode === "foot" ? "trekking" : "bicycle"}&alternativeidx=0&format=geojson`;
+                    } else {
+                        lastResortUrl = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
+                    }
                     const result = await fetchExternal(lastResortUrl);
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(result.data);
                 } catch (lastErr) {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Routing proxy failed completely', details: e.message }));
+                    try {
+                        const standardOsrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLon},${startLat};${endLon},${endLat}?overview=full&geometries=geojson`;
+                        const result = await fetchExternal(standardOsrmUrl);
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(result.data);
+                    } catch (finalErr) {
+                        res.writeHead(500, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Routing proxy failed completely', details: finalErr.message }));
+                    }
                 }
             }
         }
