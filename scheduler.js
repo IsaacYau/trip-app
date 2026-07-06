@@ -5382,12 +5382,8 @@ if (typeof document !== 'undefined') {
                         const data = docSnap.data();
                         state.activities = data.activities || [];
                         state.expenses = data.expenses || [];
-                        if (data.icCards) {
-                            state.icCards = data.icCards;
-                        }
-                        if (data.cashBalances) {
-                            state.cashBalances = data.cashBalances;
-                        }
+                        state.icCards = data.icCards || {};
+                        state.cashBalances = data.cashBalances || {};
 
                         // Extract group members from member names array (if stored in Firestore)
                         if (data.memberNames && data.memberNames.length > 0) {
