@@ -22,17 +22,18 @@ def query_overpass(q):
 
 def build_japan_gtfs():
     # 1. Fetch railway relations and their stops/stations
-    # This query retrieves all route=train/subway relations and their station stops in our target box.
+    # This query retrieves all route=train/subway/light_rail relations in our target box
+    # and only recurses their node members (stations), skipping track geometries to be fast.
     query = f"""
-    [out:json][timeout:240];
+    [out:json][timeout:180];
     (
       relation["route"="train"]({BBOX});
       relation["route"="subway"]({BBOX});
       relation["route"="light_rail"]({BBOX});
     );
     out body;
-    >;
-    out skel qt;
+    node(r);
+    out body;
     """
     
     try:
