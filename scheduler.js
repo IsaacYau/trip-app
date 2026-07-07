@@ -1452,6 +1452,7 @@ if (typeof document !== 'undefined') {
         let transitMapObj = null;
         let transitMarkersGroup = null;
         let transitPolylineGroup = null;
+        let staticStationsGroup = null;
 
         fetch("malaysia_transit_db.json")
             .then(r => { if (r.ok) return r.json(); })
@@ -1461,6 +1462,9 @@ if (typeof document !== 'undefined') {
                     TRANSIT_NETWORKS.malaysia.coordinates = data.nodes;
                     TRANSIT_NETWORKS.malaysia.links = data.links;
                     console.log("Successfully loaded high-fidelity Malaysia GTFS network!");
+                    if (typeof state !== 'undefined' && state.destination === "malaysia") {
+                        renderStaticStations();
+                    }
                 }
             })
             .catch(err => {
@@ -3462,6 +3466,7 @@ if (typeof document !== 'undefined') {
 
             transitMarkersGroup = L.layerGroup().addTo(transitMapObj);
             transitPolylineGroup = L.layerGroup().addTo(transitMapObj);
+            staticStationsGroup = L.layerGroup().addTo(transitMapObj);
 
             let userLocationMarker = null;
             let watchId = null;
@@ -3567,6 +3572,35 @@ if (typeof document !== 'undefined') {
 
             transitMarkersGroup.clearLayers();
             transitPolylineGroup.clearLayers();
+            renderStaticStations();
+        }
+
+        function renderStaticStations() {
+            if (typeof L === 'undefined' || !transitMapObj || !staticStationsGroup) return;
+            staticStationsGroup.clearLayers();
+
+            const network = TRANSIT_NETWORKS[state.destination];
+            if (!network || !network.coordinates) return;
+
+            Object.entries(network.coordinates).forEach(([stationName, coords]) => {
+                const escapedStation = escapeHtml(stationName).replace(/'/g, "\\'");
+                const popupHtml = `
+                    <div style="font-family:var(--font-primary); padding: 0.2rem; min-width: 140px; text-align: center;">
+                        <div style="font-size: 0.8rem; font-weight: 750; margin-bottom: 0.6rem; color: var(--text-primary);">${escapeHtml(stationName)}</div>
+                        <div style="display: flex; gap: 0.4rem; justify-content: center;">
+                            <button type="button" class="btn btn-primary btn-xs" onclick="window.setPinpoint('start', ${coords.lat}, ${coords.lon}, '${escapedStation}')">🚩 Start</button>
+                            <button type="button" class="btn btn-accent btn-xs" onclick="window.setPinpoint('end', ${coords.lat}, ${coords.lon}, '${escapedStation}')">🏁 End</button>
+                        </div>
+                    </div>
+                `;
+                L.circleMarker([coords.lat, coords.lon], { 
+                    radius: 5, 
+                    color: "rgba(229, 62, 94, 0.6)", 
+                    fillColor: "#ffffff", 
+                    fillOpacity: 1, 
+                    weight: 2 
+                }).addTo(staticStationsGroup).bindPopup(popupHtml);
+            });
         }
 
         function findNearestStation(lat, lon, destination) {
