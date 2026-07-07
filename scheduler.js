@@ -3582,21 +3582,35 @@ if (typeof document !== 'undefined') {
             }
 
             const calculationGroupId = state.activeGroupId;
+            const calcBtn = document.getElementById("transit-calc-btn");
+            if (calcBtn) {
+                calcBtn.disabled = true;
+                calcBtn.innerHTML = `<span style="display:inline-block; border: 2px solid rgba(255,255,255,0.2); border-left-color: #fff; border-radius: 50%; width: 12px; height: 12px; animation: spin 1s linear infinite; margin-right: 6px; vertical-align: middle;"></span> Calculating...`;
+            }
+
+            function restoreCalcBtn() {
+                if (state.activeGroupId === calculationGroupId && calcBtn) {
+                    calcBtn.disabled = false;
+                    calcBtn.innerHTML = `<i data-lucide="navigation"></i> Calculate Route`;
+                    if (window.lucide) lucide.createIcons();
+                }
+            }
 
             const startVal = transitStartQuery.value.trim();
             const endVal = transitEndQuery.value.trim();
-            if (startVal === endVal) { alert("Start and destination must be different."); return; }
+            if (startVal === endVal) { alert("Start and destination must be different."); restoreCalcBtn(); return; }
 
             // If we are in China (Shenzhen), calculate didi taxi fare
             if (state.destination === "china") {
                 calculateShenzhenDidi(startVal, endVal);
+                restoreCalcBtn();
                 return;
             }
 
             transitResultsBody.innerHTML = `<div class="empty-state"><div class="spinner"></div><p>Calculating all travel profiles (Transit, Grab, Cycle, Walk)...</p></div>`;
 
             const network = TRANSIT_NETWORKS[state.destination];
-            if (!network) return;
+            if (!network) { restoreCalcBtn(); return; }
 
             function showLocationClarificationModal(title, matches, onSelect) {
                 const backdrop = document.createElement("div");
@@ -3724,6 +3738,7 @@ if (typeof document !== 'undefined') {
             if (!startResolved) {
                 alert(`Could not resolve location: ${startVal}`);
                 updateTransitMapCenter();
+                restoreCalcBtn();
                 return;
             }
 
@@ -3732,6 +3747,7 @@ if (typeof document !== 'undefined') {
             if (!endResolved) {
                 alert(`Could not resolve location: ${endVal}`);
                 updateTransitMapCenter();
+                restoreCalcBtn();
                 return;
             }
 
@@ -3752,6 +3768,7 @@ if (typeof document !== 'undefined') {
             if (startStationName === endStationName && getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon) < 0.05) {
                 alert("Start and destination must be different.");
                 updateTransitMapCenter();
+                restoreCalcBtn();
                 return;
             }
 
@@ -4303,6 +4320,8 @@ if (typeof document !== 'undefined') {
                     showToast("🚗 Taxi Fare Logged", `Recorded ride-hailing expense in group ledger.`);
                 });
             }
+
+            restoreCalcBtn();
         });
 
         function calculateShenzhenDidi(start, end) {
