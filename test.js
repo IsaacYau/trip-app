@@ -667,6 +667,16 @@ try {
 
     console.log("✅ Geocoding and routing helper parsing tests passed!");
 
+    // -------------------------------------------------------------------------
+    // TEST 22: HTML Input Sanitization
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 22] Testing HTML Input Sanitization...");
+    assert.ok(sandbox.escapeHtml);
+    const testUnsafe = '<script>alert("XSS")</script> & "hello"';
+    const testEscaped = '&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt; &amp; &quot;hello&quot;';
+    assert.strictEqual(sandbox.escapeHtml(testUnsafe), testEscaped);
+    console.log("✅ HTML Input Sanitization verified!");
+
 
     // -------------------------------------------------------------------------
     // TEST 6: DOMContentLoaded Bootstrap Runner

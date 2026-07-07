@@ -23,6 +23,16 @@ if (firebaseConfig && firebaseConfig.apiKey) {
 // PURE LOGICAL UTILITIES (Outside DOM wrapper for unit-testability)
 // -------------------------------------------------------------------------
 
+function escapeHtml(unsafe) {
+    if (typeof unsafe !== 'string') return unsafe;
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 // Exchange Rates (Base: HKD)
 // 1 CNY = 1.15 HKD
 // 100 JPY = 5.0 HKD => 1 JPY = 0.05 HKD
@@ -2081,7 +2091,7 @@ if (typeof document !== 'undefined') {
                     previewHTML = `<div class="calendar-activities-preview">`;
                     dayActs.slice(0, 2).forEach(act => {
                         const catClass = act.category ? `cat-${act.category.toLowerCase()}` : "cat-sights";
-                        previewHTML += `<div class="activity-dot-preview ${catClass}" title="${act.timeStart} - ${act.title}">${act.title}</div>`;
+                        previewHTML += `<div class="activity-dot-preview ${catClass}" title="${act.timeStart} - ${escapeHtml(act.title)}">${escapeHtml(act.title)}</div>`;
                     });
                     if (dayActs.length > 2) previewHTML += `<div class="activity-dot-preview" style="background-color: var(--text-secondary)">+${dayActs.length - 2} more</div>`;
                     previewHTML += `</div>`;
@@ -2258,7 +2268,7 @@ if (typeof document !== 'undefined') {
                     blockContent = `
                         <div class="time-block-compact" style="display: flex; align-items: center; justify-content: space-between; height: 100%; width: 100%;">
                             <div class="time-block-title" style="color: ${colors.text}; font-size: 0.7rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 4px;">
-                                ${act.title}
+                                ${escapeHtml(act.title)}
                             </div>
                             <div class="time-block-time" style="color: ${colors.text}; font-size: 0.6rem; font-weight: 700; white-space: nowrap; opacity: 0.85; margin-right: 32px;">
                                 ${act.timeStart}
@@ -2276,13 +2286,13 @@ if (typeof document !== 'undefined') {
                 } else {
                     // Regular full height event layout
                     blockContent = `
-                        <div class="time-block-title" style="color: ${colors.text}; font-weight: 800; font-size: 0.75rem;">${act.title}</div>
+                        <div class="time-block-title" style="color: ${colors.text}; font-weight: 800; font-size: 0.75rem;">${escapeHtml(act.title)}</div>
                         <div class="time-block-time" style="color: ${colors.text}; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; gap: 0.2rem;">
                             <i data-lucide="clock" style="width: 10px; height: 10px; color: ${colors.text};"></i>
                             <span>${timeText}</span>
                             ${reminderIcon}
                         </div>
-                        ${act.location ? `<div class="time-block-loc" style="color: ${colors.text}; font-size: 0.65rem; opacity: 0.95;">📍 ${act.location.split(",")[0]}</div>` : ""}
+                        ${act.location ? `<div class="time-block-loc" style="color: ${colors.text}; font-size: 0.65rem; opacity: 0.95;">📍 ${escapeHtml(act.location.split(",")[0])}</div>` : ""}
                         <div class="time-block-actions">
                             <button class="time-block-btn" style="color: ${colors.text}" onclick="event.stopPropagation(); editActivityHandler('${act.id}')">
                                 <i data-lucide="edit-3"></i>
@@ -4770,7 +4780,7 @@ if (typeof document !== 'undefined') {
                     if (exp.paymentMethod) {
                         const pm = exp.paymentMethod;
                         const payIcon = pm.type === "cash" ? "💵" : pm.type === "transit" ? "🚇" : "📱";
-                        const payLabel = pm.type === "cash" ? "Cash" : pm.type === "transit" ? "Transit" : (pm.subType || "ePayment");
+                        const payLabel = pm.type === "cash" ? "Cash" : pm.type === "transit" ? "Transit" : escapeHtml(pm.subType || "ePayment");
                         payBadge = `<span class="activity-badge" style="background:var(--border); color:var(--text-secondary); padding:1px 4px; font-size:0.6rem; font-weight:700;">${payIcon} ${payLabel}</span>`;
                     }
 
@@ -4784,16 +4794,16 @@ if (typeof document !== 'undefined') {
                         else if (exp.currency === "CNY") shareLabel = `¥${share.toFixed(2)}`;
                         else shareLabel = `HKD $${share.toFixed(2)}`;
 
-                        splitBadge = `<span style="font-size:0.65rem; color:var(--text-secondary);">÷ ${exp.splitAmong.join(", ")} (${shareLabel} each)</span>`;
+                        splitBadge = `<span style="font-size:0.65rem; color:var(--text-secondary);">÷ ${exp.splitAmong.map(escapeHtml).join(", ")} (${shareLabel} each)</span>`;
                     }
 
-                    const displayTitle = exp.title || exp.category;
+                    const displayTitle = escapeHtml(exp.title || exp.category);
 
                     item.innerHTML = `
                         <div class="expense-info">
                             <div class="expense-item-title">${displayTitle}</div>
                             <div class="expense-item-meta" style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
-                                <span>${exp.payer} · ${exp.category}</span>
+                                <span>${escapeHtml(exp.payer)} · ${escapeHtml(exp.category)}</span>
                                 <span class="activity-badge" style="${typeStyle} padding:1px 5px; font-size:0.6rem; font-weight:700;">${typeText}</span>
                                 ${payBadge}
                                 ${splitBadge}
