@@ -557,6 +557,9 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     async function queryUrl(url) {
         const hasAbort = (typeof AbortController !== 'undefined');
         const controller = hasAbort ? new AbortController() : null;
+        if (controller && typeof activeRoutingAbortControllers !== 'undefined') {
+            activeRoutingAbortControllers.push(controller);
+        }
         const timeoutId = controller ? setTimeout(() => controller.abort(), 25000) : null;
         try {
             const fetchOpts = controller ? { signal: controller.signal } : {};
@@ -1206,6 +1209,7 @@ if (typeof document !== 'undefined') {
         let placesDatabase = [];
         let placesCurrentPage = 1;
         let gpsCurrentPage = 1;
+        let activeRoutingAbortControllers = [];
 
         const monthNames = [
             "January", "February", "March", "April", "May", "June",
@@ -3533,9 +3537,14 @@ if (typeof document !== 'undefined') {
             if (!transitMapObj) return;
             const centerCoords = state.destination === "japan" ? [35.17091, 136.88153] :
                                  state.destination === "malaysia" ? [3.13442, 101.68611] : [22.518, 114.055];
+
+            // Clear Leaflet maxBounds FIRST to prevent getting stuck
+            transitMapObj.setMaxBounds(null);
+            
+            // Set the view
             transitMapObj.setView(centerCoords, state.destination === "japan" ? 11 : 12);
 
-            // Restrict panning and viewport interactions strictly inside the destination country
+            // Apply the bounds restriction
             const bounds = getDestinationBounds(state.destination);
             if (bounds) {
                 const corner1 = L.latLng(bounds.minLat, bounds.minLon);
@@ -3565,6 +3574,13 @@ if (typeof document !== 'undefined') {
 
         transitForm.addEventListener("submit", async (e) => {
             e.preventDefault();
+            
+            // Abort any ongoing calculations
+            if (typeof activeRoutingAbortControllers !== 'undefined') {
+                activeRoutingAbortControllers.forEach(c => c.abort());
+                activeRoutingAbortControllers = [];
+            }
+
             const startVal = transitStartQuery.value.trim();
             const endVal = transitEndQuery.value.trim();
             if (startVal === endVal) { alert("Start and destination must be different."); return; }
@@ -5452,6 +5468,12 @@ if (typeof document !== 'undefined') {
             if (networkUnsubscribe) {
                 networkUnsubscribe();
                 networkUnsubscribe = null;
+            }
+
+            // Abort any ongoing routing calculations immediately
+            if (typeof activeRoutingAbortControllers !== 'undefined') {
+                activeRoutingAbortControllers.forEach(c => c.abort());
+                activeRoutingAbortControllers = [];
             }
 
             // Show a visual notification
