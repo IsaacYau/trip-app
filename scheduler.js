@@ -5531,30 +5531,31 @@ if (typeof document !== 'undefined') {
                             if (destSelect) {
                                 destSelect.value = state.destination;
                             }
-                            updateDestinationUI();
-                            saveICCardsToStorage();
+                        }
+                        
+                        updateDestinationUI();
+                        saveICCardsToStorage();
 
-                            // Clear map layers and reset inputs safely
-                            if (typeof transitMarkersGroup !== 'undefined' && transitMarkersGroup) transitMarkersGroup.clearLayers();
-                            if (typeof transitPolylineGroup !== 'undefined' && transitPolylineGroup) transitPolylineGroup.clearLayers();
-                            if (transitStart) transitStart.value = "";
-                            if (transitEnd) transitEnd.value = "";
-                            if (transitStartCoords) transitStartCoords.value = "";
-                            if (transitEndCoords) transitEndCoords.value = "";
-                            if (transitResultsBody) {
-                                transitResultsBody.innerHTML = `<div class="empty-state"><i data-lucide="map" class="empty-icon"></i><p>Select route stations and calculate.</p></div>`;
-                                if (window.lucide) lucide.createIcons();
-                            }
+                        // Clear map layers and reset inputs safely
+                        if (typeof transitMarkersGroup !== 'undefined' && transitMarkersGroup) transitMarkersGroup.clearLayers();
+                        if (typeof transitPolylineGroup !== 'undefined' && transitPolylineGroup) transitPolylineGroup.clearLayers();
+                        if (transitStart) transitStart.value = "";
+                        if (transitEnd) transitEnd.value = "";
+                        if (transitStartCoords) transitStartCoords.value = "";
+                        if (transitEndCoords) transitEndCoords.value = "";
+                        if (transitResultsBody) {
+                            transitResultsBody.innerHTML = `<div class="empty-state"><i data-lucide="map" class="empty-icon"></i><p>Select route stations and calculate.</p></div>`;
+                            if (window.lucide) lucide.createIcons();
+                        }
 
-                            // Reset places tab UI and filters
-                            if (pSearch) pSearch.value = "";
-                            if (pCity) pCity.value = "All";
-                            populateCityDropdown();
-                            renderPlacesGrid();
+                        // Reset places tab UI and filters
+                        if (pSearch) pSearch.value = "";
+                        if (pCity) pCity.value = "All";
+                        populateCityDropdown();
+                        renderPlacesGrid();
 
-                            if (window.setupUserLocationTracking) {
-                                window.setupUserLocationTracking();
-                            }
+                        if (window.setupUserLocationTracking) {
+                            window.setupUserLocationTracking();
                         }
 
                         updateProfileUI();
