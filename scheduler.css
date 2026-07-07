@@ -2837,6 +2837,10 @@ textarea:focus {
 }
 
 /* Invert native time and date picker indicator icons in dark theme for visibility */
+[data-theme="dark"] input[type="time"],
+[data-theme="dark"] input[type="date"] {
+    color-scheme: dark;
+}
 [data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator,
 [data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
     filter: invert(1);
