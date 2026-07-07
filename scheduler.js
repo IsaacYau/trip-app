@@ -3420,6 +3420,64 @@ if (typeof document !== 'undefined') {
             transitMarkersGroup = L.layerGroup().addTo(transitMapObj);
             transitPolylineGroup = L.layerGroup().addTo(transitMapObj);
 
+            let userLocationMarker = null;
+            let watchId = null;
+
+            function setupUserLocationTracking() {
+                if (!navigator.geolocation) {
+                    console.log("Geolocation is not supported by this browser.");
+                    return;
+                }
+                if (watchId !== null) {
+                    navigator.geolocation.clearWatch(watchId);
+                }
+
+                watchId = navigator.geolocation.watchPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    let inBounds = false;
+                    if (state.destination === "japan") {
+                        if (lat >= 30.0 && lat <= 46.0 && lon >= 128.0 && lon <= 146.0) {
+                            inBounds = true;
+                        }
+                    } else if (state.destination === "malaysia") {
+                        if (lat >= 1.0 && lat <= 7.5 && lon >= 99.0 && lon <= 120.0) {
+                            inBounds = true;
+                        }
+                    }
+
+                    if (inBounds) {
+                        if (userLocationMarker) {
+                            userLocationMarker.setLatLng([lat, lon]);
+                        } else {
+                            userLocationMarker = L.circleMarker([lat, lon], {
+                                radius: 8,
+                                color: "#0078FF",
+                                fillColor: "#0078FF",
+                                fillOpacity: 0.9,
+                                weight: 3
+                            }).addTo(transitMapObj).bindPopup("<b>Your Current Location</b>");
+                        }
+                    } else {
+                        if (userLocationMarker) {
+                            transitMapObj.removeLayer(userLocationMarker);
+                            userLocationMarker = null;
+                        }
+                    }
+                }, (error) => {
+                    console.warn("Geolocation watch error:", error);
+                }, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                });
+            }
+
+            // Expose setupUserLocationTracking to window scope so we can call it on group switch
+            window.setupUserLocationTracking = setupUserLocationTracking;
+            setupUserLocationTracking();
+
             // Click listener for interactive pinpointing
             transitMapObj.on("click", (e) => {
                 const latlng = e.latlng;
@@ -4183,7 +4241,8 @@ if (typeof document !== 'undefined') {
                         payer: state.activeUser,
                         category: "Transport",
                         type: "global",
-                        date: new Date().toLocaleDateString()
+                        day: getTodayTripDay(),
+                        date: getTodayTripDay()
                     };
                     state.expenses.push(exp);
                     saveExpensesToStorage();
@@ -4234,7 +4293,8 @@ if (typeof document !== 'undefined') {
                     payer: state.activeUser,
                     category: "Transport",
                     type: "global",
-                    date: new Date().toLocaleDateString()
+                    day: getTodayTripDay(),
+                    date: getTodayTripDay()
                 };
                 state.expenses.push(exp);
                 saveExpensesToStorage();
@@ -5357,12 +5417,6 @@ if (typeof document !== 'undefined') {
                 }
             } catch (err) {
                 console.error("Error loading user networks:", err);
-                selectEl.disabled = true;
-                const opt = document.createElement("option");
-                opt.value = "";
-                opt.textContent = "No Active Trip";
-                selectEl.appendChild(opt);
-                state.activeGroupId = "";
             }
         }
 
@@ -5371,6 +5425,14 @@ if (typeof document !== 'undefined') {
                 networkUnsubscribe();
                 networkUnsubscribe = null;
             }
+
+            // Show a visual notification
+            showToast("🔄 Group Switched", `Active group changed to: ${groupId === "TRIP-2026" ? "Offline Default" : groupId}`);
+
+            const pSearch = document.getElementById("places-search");
+            const pCity = document.getElementById("places-city-select");
+            const transitStart = document.getElementById("transit-start-input");
+            const transitEnd = document.getElementById("transit-end-input");
 
             if (!groupId || groupId === "TRIP-2026" || !db) {
                 state.activeGroupId = "TRIP-2026";
@@ -5382,6 +5444,26 @@ if (typeof document !== 'undefined') {
                 renderLedger();
                 renderDebtSettlement();
                 updateIcEstimator();
+
+                // Clear map layers and reset inputs safely
+                if (typeof transitMarkersGroup !== 'undefined' && transitMarkersGroup) transitMarkersGroup.clearLayers();
+                if (typeof transitPolylineGroup !== 'undefined' && transitPolylineGroup) transitPolylineGroup.clearLayers();
+                if (transitStart) transitStart.value = "";
+                if (transitEnd) transitEnd.value = "";
+                if (transitResultsBody) {
+                    transitResultsBody.innerHTML = `<div class="empty-state"><i data-lucide="map" class="empty-icon"></i><p>Select route stations and calculate.</p></div>`;
+                    if (window.lucide) lucide.createIcons();
+                }
+
+                // Reset places tab UI and filters
+                if (pSearch) pSearch.value = "";
+                if (pCity) pCity.value = "All";
+                populateCityDropdown();
+                renderPlacesGrid();
+
+                if (window.setupUserLocationTracking) {
+                    window.setupUserLocationTracking();
+                }
                 return;
             }
 
@@ -5419,6 +5501,26 @@ if (typeof document !== 'undefined') {
                             }
                             updateDestinationUI();
                             saveICCardsToStorage();
+
+                            // Clear map layers and reset inputs safely
+                            if (typeof transitMarkersGroup !== 'undefined' && transitMarkersGroup) transitMarkersGroup.clearLayers();
+                            if (typeof transitPolylineGroup !== 'undefined' && transitPolylineGroup) transitPolylineGroup.clearLayers();
+                            if (transitStart) transitStart.value = "";
+                            if (transitEnd) transitEnd.value = "";
+                            if (transitResultsBody) {
+                                transitResultsBody.innerHTML = `<div class="empty-state"><i data-lucide="map" class="empty-icon"></i><p>Select route stations and calculate.</p></div>`;
+                                if (window.lucide) lucide.createIcons();
+                            }
+
+                            // Reset places tab UI and filters
+                            if (pSearch) pSearch.value = "";
+                            if (pCity) pCity.value = "All";
+                            populateCityDropdown();
+                            renderPlacesGrid();
+
+                            if (window.setupUserLocationTracking) {
+                                window.setupUserLocationTracking();
+                            }
                         }
 
                         updateProfileUI();
@@ -5442,7 +5544,7 @@ if (typeof document !== 'undefined') {
                     console.error("Error in network real-time sync listener:", err);
                 });
             } catch (err) {
-                console.error("Error setting up real-time listener:", err);
+                console.error("Failed to register group real-time listener:", err);
             }
         }
 
