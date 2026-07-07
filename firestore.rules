@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /trip_networks/{networkId} {
+      allow get, write: if true;
+      allow create: if request.resource.data.keys().hasAll(['destination', 'memberNames', 'expenses']);
+      allow delete: if false;
+    }
+    match /groups/{groupId} {
+      allow get, write: if true;
+      allow create: if request.resource.data.keys().hasAll(['destination', 'members', 'expenses']);
+      allow delete: if false;
+    }
+  }
+}
