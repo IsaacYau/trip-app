@@ -557,7 +557,7 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     async function queryUrl(url) {
         const hasAbort = (typeof AbortController !== 'undefined');
         const controller = hasAbort ? new AbortController() : null;
-        const timeoutId = controller ? setTimeout(() => controller.abort(), 10000) : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 25000) : null;
         try {
             const fetchOpts = controller ? { signal: controller.signal } : {};
             const response = await fetch(url, fetchOpts);
@@ -3633,6 +3633,15 @@ if (typeof document !== 'undefined') {
             const endStationName = endResolved.name;
             const startLocCoords = startResolved.coords;
             const endLocCoords = endResolved.coords;
+
+            const distBetween = getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon);
+            if (distBetween > 35) {
+                if (state.destination === "japan") {
+                    showToast("🚄 Inter-City Travel Detect", "Locations are too far apart for local routing. For cross-city travel (e.g. Osaka ➔ Nagoya), please check Shinkansen (Bullet Train) or JR Express Rail timetables.");
+                } else {
+                    showToast("🚌 Inter-City Travel Detect", "Locations are too far apart for local routing. For cross-city travel (e.g. KL ➔ Penang), please check KTM ETS trains or long-distance bus schedules.");
+                }
+            }
 
             if (startStationName === endStationName && getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon) < 0.05) {
                 alert("Start and destination must be different.");
