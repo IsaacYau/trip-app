@@ -4315,6 +4315,20 @@ if (typeof document !== 'undefined') {
                 });
             });
 
+            function disableFareButtons() {
+                const chargeTransitBtn = document.getElementById("charge-ic-transit-btn");
+                if (chargeTransitBtn) {
+                    chargeTransitBtn.disabled = true;
+                    chargeTransitBtn.innerHTML = `<i data-lucide="check-circle"></i> Transit Fare Added`;
+                }
+                const chargeGrabBtn = document.getElementById("charge-grab-wallet-btn");
+                if (chargeGrabBtn) {
+                    chargeGrabBtn.disabled = true;
+                    chargeGrabBtn.innerHTML = `<i data-lucide="check-circle"></i> Ride Fare Logged`;
+                }
+                if (window.lucide) lucide.createIcons();
+            }
+
             // Charge transit fare listener
             const chargeTransitBtn = document.getElementById("charge-ic-transit-btn");
             if (chargeTransitBtn) {
@@ -4328,6 +4342,7 @@ if (typeof document !== 'undefined') {
                     saveICCardsToStorage();
                     updateIcEstimator();
                     showToast("🚇 Fares Charged", `Deducted ${symbol}${transitFareTotal.toFixed(2)} from ${state.activeUser}'s transit balance.`);
+                    disableFareButtons();
                 });
             }
 
@@ -4400,6 +4415,7 @@ if (typeof document !== 'undefined') {
                     renderDebtSettlement();
                     updateIcEstimator();
                     showToast("🚗 Taxi Fare Logged", `Recorded ride-hailing expense in group ledger.`);
+                    disableFareButtons();
                 });
             }
 
