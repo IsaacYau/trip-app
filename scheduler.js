@@ -3433,13 +3433,14 @@ if (typeof document !== 'undefined') {
             if (window.lucide) lucide.createIcons();
         }
 
-        window.setPinpoint = (type, lat, lng) => {
+        window.setPinpoint = (type, lat, lng, displayName = null) => {
             const coordsVal = JSON.stringify({ lat, lon: lng });
+            const nameVal = displayName || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
             if (type === 'start') {
-                if (transitStartQuery) transitStartQuery.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                if (transitStartQuery) transitStartQuery.value = nameVal;
                 if (transitStartCoords) transitStartCoords.value = coordsVal;
             } else {
-                if (transitEndQuery) transitEndQuery.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                if (transitEndQuery) transitEndQuery.value = nameVal;
                 if (transitEndCoords) transitEndCoords.value = coordsVal;
             }
             if (transitMapObj) transitMapObj.closePopup();
@@ -4136,7 +4137,9 @@ if (typeof document !== 'undefined') {
                             });
                             route.path.slice(1).forEach(station => {
                                 const sc = network.coordinates[station];
-                                L.circleMarker([sc.lat, sc.lon], { radius: 6, color: "#e53e3e", fillColor: "#ffffff", fillOpacity: 1, weight: 3 }).addTo(transitPolylineGroup).bindPopup(`<b>Station:</b> ${station}`);
+                                const escapedStation = escapeHtml(station).replace(/'/g, "\\'");
+                                const popupHtml = `<div style="font-family:var(--font-primary); padding: 0.2rem; min-width: 140px; text-align: center;"><div style="font-size: 0.8rem; font-weight: 750; margin-bottom: 0.6rem; color: var(--text-primary);">${escapeHtml(station)}</div><div style="display: flex; gap: 0.4rem; justify-content: center;"><button type="button" class="btn btn-primary btn-xs" onclick="window.setPinpoint('start', ${sc.lat}, ${sc.lon}, '${escapedStation}')">🚩 Start</button><button type="button" class="btn btn-accent btn-xs" onclick="window.setPinpoint('end', ${sc.lat}, ${sc.lon}, '${escapedStation}')">🏁 End</button></div></div>`;
+                                L.circleMarker([sc.lat, sc.lon], { radius: 6, color: "#e53e3e", fillColor: "#ffffff", fillOpacity: 1, weight: 3 }).addTo(transitPolylineGroup).bindPopup(popupHtml);
                             });
                             if (endWalkCoords.length > 0) L.polyline(endWalkCoords, { color: "#3182ce", dashArray: "5, 10", weight: 4 }).addTo(transitPolylineGroup);
                         }

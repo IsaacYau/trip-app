@@ -685,6 +685,9 @@ try {
     console.log("✅ Transit-Ledger alerts verified!");
 
     // -------------------------------------------------------------------------
+    // TEST 24: Interactive Map Action Shortcuts
+    // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // TEST 6: DOMContentLoaded Bootstrap Runner
     // -------------------------------------------------------------------------
     console.log("\n[Test 6] Testing DOMContentLoaded Bootstrap lifecycle...");
@@ -696,6 +699,14 @@ try {
     domContentLoadedCallback();
 
     console.log("✅ DOMContentLoaded Bootstrap lifecycle completed successfully!");
+
+    // -------------------------------------------------------------------------
+    // TEST 24: Interactive Map Action Shortcuts
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 24] Testing Interactive Map Action Shortcuts...");
+    assert.ok(sandbox.window.setPinpoint);
+    sandbox.window.setPinpoint('start', 34.685, 135.525, 'Osaka Station');
+    console.log("✅ Interactive Map Action Shortcuts verified!");
 
     console.log("\n🎉 ALL TESTS PASSED SUCCESSFULLY! ZERO BUGS DETECTED.");
 } catch (err) {
