@@ -2,9 +2,9 @@
 
 | Task ID | Description | Status |
 |---|---|---|
-| TASK-1 | Brainstorm and select design approach for 🚇 Transit-Ledger Integration | COMPLETED |
-| TASK-2 | Brainstorm and select design approach for 🗺️ Interactive Map Enhancements | COMPLETED |
-| TASK-3 | Brainstorm and select design approach for 💸 Expense Ledger Split Updates | COMPLETED |
-| TASK-4 | Conduct security audit and review testing edge cases | COMPLETED |
-| TASK-5 | Write final validated Design Document and commit | COMPLETED |
-| TASK-6 | Create detailed step-by-step implementation plan | COMPLETED |
+| TASK-1 | XSS Input Sanitization via escapeHtml | NOT_STARTED |
+| TASK-2 | Transit-Ledger Low Balance Alerts & Inline Top-up | NOT_STARTED |
+| TASK-3 | Interactive Map Action Shortcuts | NOT_STARTED |
+| TASK-4 | Daily Budget Progress Bar | NOT_STARTED |
+| TASK-5 | CSS Stacked Category Spend Distribution Chart | NOT_STARTED |
+| TASK-6 | Firestore Security Rules Schema | NOT_STARTED |
