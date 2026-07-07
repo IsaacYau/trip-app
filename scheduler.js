@@ -3581,6 +3581,8 @@ if (typeof document !== 'undefined') {
                 activeRoutingAbortControllers = [];
             }
 
+            const calculationGroupId = state.activeGroupId;
+
             const startVal = transitStartQuery.value.trim();
             const endVal = transitEndQuery.value.trim();
             if (startVal === endVal) { alert("Start and destination must be different."); return; }
@@ -3718,6 +3720,7 @@ if (typeof document !== 'undefined') {
             }
 
             const startResolved = await resolveCoords(startVal, "Start");
+            if (typeof calculationGroupId !== 'undefined' && calculationGroupId !== state.activeGroupId) return;
             if (!startResolved) {
                 alert(`Could not resolve location: ${startVal}`);
                 updateTransitMapCenter();
@@ -3725,6 +3728,7 @@ if (typeof document !== 'undefined') {
             }
 
             const endResolved = await resolveCoords(endVal, "Destination");
+            if (typeof calculationGroupId !== 'undefined' && calculationGroupId !== state.activeGroupId) return;
             if (!endResolved) {
                 alert(`Could not resolve location: ${endVal}`);
                 updateTransitMapCenter();
@@ -3759,6 +3763,7 @@ if (typeof document !== 'undefined') {
             let route;
             if (state.destination === "japan") {
                 route = await fetchOtpTransitRoute(startLocCoords, endLocCoords);
+                if (typeof calculationGroupId !== 'undefined' && calculationGroupId !== state.activeGroupId) return;
             } else {
                 const routeFastest = findDijkstraRoute(state.destination, startStationName, endStationName, "time", travelDate, travelTime);
                 const routeCheapest = findDijkstraRoute(state.destination, startStationName, endStationName, "fare", travelDate, travelTime);
@@ -3784,6 +3789,7 @@ if (typeof document !== 'undefined') {
                 fetchOsrmRoute(startLocCoords, endLocCoords, "bicycle"),
                 fetchOsrmRoute(startLocCoords, endLocCoords, "driving")
             ]);
+            if (typeof calculationGroupId !== 'undefined' && calculationGroupId !== state.activeGroupId) return;
 
             const dist = getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon);
             const walkDist = fullWalk ? fullWalk.distance : dist;
@@ -4055,6 +4061,7 @@ if (typeof document !== 'undefined') {
                 const distToEndStation = getHaversineDistance(endStationCoords.lat, endStationCoords.lon, endLocCoords.lat, endLocCoords.lon);
                 if (distToEndStation > 0.05) {
                     const walkPath = await fetchOsrmRoute(endStationCoords, endLocCoords, "foot");
+                    if (typeof calculationGroupId !== 'undefined' && calculationGroupId !== state.activeGroupId) return;
                     if (walkPath) {
                         endWalkCoords = walkPath.coordinates;
                         const segmentWalkTime = Math.max(1, Math.round(walkPath.distance * 12));
@@ -5476,15 +5483,32 @@ if (typeof document !== 'undefined') {
                 activeRoutingAbortControllers = [];
             }
 
-            // Show a visual notification
-            showToast("🔄 Group Switched", `Active group changed to: ${groupId === "TRIP-2026" ? "Offline Default" : groupId}`);
-
-            const pSearch = document.getElementById("places-search");
-            const pCity = document.getElementById("places-city-select");
+            // Clear inputs, map overlays, and result body instantly
             const transitStart = document.getElementById("transit-start-query");
             const transitEnd = document.getElementById("transit-end-query");
             const transitStartCoords = document.getElementById("transit-start-coords");
             const transitEndCoords = document.getElementById("transit-end-coords");
+            const pSearch = document.getElementById("places-search");
+            const pCity = document.getElementById("places-city-select");
+
+            if (transitStart) transitStart.value = "";
+            if (transitEnd) transitEnd.value = "";
+            if (transitStartCoords) transitStartCoords.value = "";
+            if (transitEndCoords) transitEndCoords.value = "";
+            if (pSearch) pSearch.value = "";
+            if (pCity) pCity.value = "All";
+
+            // Temporarily unlock Leaflet map bounds to allow smooth flight when destination changes
+            if (typeof transitMapObj !== 'undefined' && transitMapObj) transitMapObj.setMaxBounds(null);
+            if (typeof transitMarkersGroup !== 'undefined' && transitMarkersGroup) transitMarkersGroup.clearLayers();
+            if (typeof transitPolylineGroup !== 'undefined' && transitPolylineGroup) transitPolylineGroup.clearLayers();
+            if (transitResultsBody) {
+                transitResultsBody.innerHTML = `<div class="empty-state"><i data-lucide="map" class="empty-icon"></i><p>Select route stations and calculate.</p></div>`;
+                if (window.lucide) lucide.createIcons();
+            }
+
+            // Show a visual notification
+            showToast("🔄 Group Switched", `Active group changed to: ${groupId === "TRIP-2026" ? "Offline Default" : groupId}`);
 
             if (!groupId || groupId === "TRIP-2026" || !db) {
                 state.activeGroupId = "TRIP-2026";
