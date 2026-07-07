@@ -3358,6 +3358,16 @@ if (typeof document !== 'undefined') {
             populateTransitDropdowns();
             renderPlacesGrid();
             populateCityDropdown();
+
+            // Clear input fields and hidden coordinates
+            const transitStartQuery = document.getElementById("transit-start-query");
+            const transitEndQuery = document.getElementById("transit-end-query");
+            const transitStartCoords = document.getElementById("transit-start-coords");
+            const transitEndCoords = document.getElementById("transit-end-coords");
+            if (transitStartQuery) transitStartQuery.value = "";
+            if (transitEndQuery) transitEndQuery.value = "";
+            if (transitStartCoords) transitStartCoords.value = "";
+            if (transitEndCoords) transitEndCoords.value = "";
             
             if (gpsRecHeader) gpsRecHeader.style.display = "none";
             if (gpsRecGrid) gpsRecGrid.style.display = "none";
@@ -3366,6 +3376,9 @@ if (typeof document !== 'undefined') {
             gpsCurrentPage = 1;
             updateIcEstimator();
             renderRechargeButtons();
+
+            // Center Leaflet map on the active destination
+            updateTransitMapCenter();
 
             // Lock currency to destination
             const currencyMap = { japan: "JPY", malaysia: "MYR", china: "CNY" };
@@ -5446,8 +5459,10 @@ if (typeof document !== 'undefined') {
 
             const pSearch = document.getElementById("places-search");
             const pCity = document.getElementById("places-city-select");
-            const transitStart = document.getElementById("transit-start-input");
-            const transitEnd = document.getElementById("transit-end-input");
+            const transitStart = document.getElementById("transit-start-query");
+            const transitEnd = document.getElementById("transit-end-query");
+            const transitStartCoords = document.getElementById("transit-start-coords");
+            const transitEndCoords = document.getElementById("transit-end-coords");
 
             if (!groupId || groupId === "TRIP-2026" || !db) {
                 state.activeGroupId = "TRIP-2026";
@@ -5465,6 +5480,8 @@ if (typeof document !== 'undefined') {
                 if (typeof transitPolylineGroup !== 'undefined' && transitPolylineGroup) transitPolylineGroup.clearLayers();
                 if (transitStart) transitStart.value = "";
                 if (transitEnd) transitEnd.value = "";
+                if (transitStartCoords) transitStartCoords.value = "";
+                if (transitEndCoords) transitEndCoords.value = "";
                 if (transitResultsBody) {
                     transitResultsBody.innerHTML = `<div class="empty-state"><i data-lucide="map" class="empty-icon"></i><p>Select route stations and calculate.</p></div>`;
                     if (window.lucide) lucide.createIcons();
@@ -5522,6 +5539,8 @@ if (typeof document !== 'undefined') {
                             if (typeof transitPolylineGroup !== 'undefined' && transitPolylineGroup) transitPolylineGroup.clearLayers();
                             if (transitStart) transitStart.value = "";
                             if (transitEnd) transitEnd.value = "";
+                            if (transitStartCoords) transitStartCoords.value = "";
+                            if (transitEndCoords) transitEndCoords.value = "";
                             if (transitResultsBody) {
                                 transitResultsBody.innerHTML = `<div class="empty-state"><i data-lucide="map" class="empty-icon"></i><p>Select route stations and calculate.</p></div>`;
                                 if (window.lucide) lucide.createIcons();
