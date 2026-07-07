@@ -520,39 +520,39 @@ async function fetchOtpTransitRoute(startLocCoords, endLocCoords) {
     return null;
 }
 
+function decodePolyline(str) {
+    let index = 0, lat = 0, lng = 0, coordinates = [], shift = 0, result = 0, byte = null, lat_change, lng_change;
+    while (index < str.length) {
+        byte = null;
+        shift = 0;
+        result = 0;
+        do {
+            byte = str.charCodeAt(index++) - 63;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+        } while (byte >= 0x20);
+        lat_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+        lat += lat_change;
+
+        shift = 0;
+        result = 0;
+        do {
+            byte = str.charCodeAt(index++) - 63;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+        } while (byte >= 0x20);
+        lng_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+        lng += lng_change;
+
+        coordinates.push([lat / 100000.0, lng / 100000.0]);
+    }
+    return coordinates;
+}
+
 // OSRM Routing service (100% Free for walking/cycling/driving)
 async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     if (!startCoord || !endCoord) return null;
     const isTestEnv = (typeof state === 'undefined');
-    
-    function decodePolyline(str) {
-        let index = 0, lat = 0, lng = 0, coordinates = [], shift = 0, result = 0, byte = null, lat_change, lng_change;
-        while (index < str.length) {
-            byte = null;
-            shift = 0;
-            result = 0;
-            do {
-                byte = str.charCodeAt(index++) - 63;
-                result |= (byte & 0x1f) << shift;
-                shift += 5;
-            } while (byte >= 0x20);
-            lat_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
-            lat += lat_change;
-
-            shift = 0;
-            result = 0;
-            do {
-                byte = str.charCodeAt(index++) - 63;
-                result |= (byte & 0x1f) << shift;
-                shift += 5;
-            } while (byte >= 0x20);
-            lng_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
-            lng += lng_change;
-
-            coordinates.push([lat / 100000.0, lng / 100000.0]);
-        }
-        return coordinates;
-    }
     
     async function queryUrl(url) {
         const hasAbort = (typeof AbortController !== 'undefined');
@@ -3344,13 +3344,25 @@ if (typeof document !== 'undefined') {
         });
 
         function updateDestinationUI() {
+            const gpsRecHeader = document.getElementById("gps-recommendations-header");
+            const gpsRecGrid = document.getElementById("gps-recommendations");
+            const gpsStatusBar = document.getElementById("gps-status-bar");
+            const gpsPaginationContainer = document.getElementById("gps-pagination-container");
+            const expenseCurrencySelect = document.getElementById("expense-currency");
+            const transitTitle = document.getElementById("transit-title");
+            const transitSubtitle = document.getElementById("transit-subtitle");
+            const transitCardTitle = document.getElementById("transit-card-title");
+            const transitCriteriaContainer = document.getElementById("transit-criteria-container");
+            const taxiTypeContainer = document.getElementById("taxi-type-container");
+
             populateTransitDropdowns();
             renderPlacesGrid();
             populateCityDropdown();
-            gpsRecHeader.style.display = "none";
-            gpsRecGrid.style.display = "none";
-            gpsStatusBar.style.display = "none";
-            gpsPaginationContainer.innerHTML = "";
+            
+            if (gpsRecHeader) gpsRecHeader.style.display = "none";
+            if (gpsRecGrid) gpsRecGrid.style.display = "none";
+            if (gpsStatusBar) gpsStatusBar.style.display = "none";
+            if (gpsPaginationContainer) gpsPaginationContainer.innerHTML = "";
             gpsCurrentPage = 1;
             updateIcEstimator();
             renderRechargeButtons();
@@ -3375,19 +3387,22 @@ if (typeof document !== 'undefined') {
             if (icSymbolEl) icSymbolEl.textContent = state.destination === "malaysia" ? "RM" : "¥";
 
             if (state.destination === "china") {
-                transitTitle.textContent = "Didi Ride Fare Estimator";
-                transitSubtitle.textContent = "Plan your taxi rides and didi fares across Shenzhen Futian.";
-                transitCardTitle.innerHTML = `<i data-lucide="car"></i> Didi Ride Estimator`;
-                transitCriteriaContainer.style.display = "none";
-                taxiTypeContainer.style.display = "flex";
+                if (transitTitle) transitTitle.textContent = "Didi Ride Fare Estimator";
+                if (transitSubtitle) transitSubtitle.textContent = "Plan your taxi rides and didi fares across Shenzhen Futian.";
+                if (transitCardTitle) transitCardTitle.innerHTML = `<i data-lucide="car"></i> Didi Ride Estimator`;
+                if (transitCriteriaContainer) transitCriteriaContainer.style.display = "none";
+                if (taxiTypeContainer) taxiTypeContainer.style.display = "flex";
             } else {
-                transitTitle.textContent = "Subway Node Optimizer";
-                transitSubtitle.textContent = "Calculate the fastest route and optimize subway transitions.";
-                transitCardTitle.innerHTML = `<i data-lucide="git-fork"></i> Route Planner`;
-                transitCriteriaContainer.style.display = "flex";
-                taxiTypeContainer.style.display = "none";
+                if (transitTitle) transitTitle.textContent = "Subway Node Optimizer";
+                if (transitSubtitle) transitSubtitle.textContent = "Calculate the fastest route and optimize subway transitions.";
+                if (transitCardTitle) transitCardTitle.innerHTML = `<i data-lucide="map"></i> Subway Optimizer`;
+                if (transitCriteriaContainer) transitCriteriaContainer.style.display = "block";
+                if (taxiTypeContainer) taxiTypeContainer.style.display = "none";
             }
-            transitResultsBody.innerHTML = `<div class="empty-state"><i data-lucide="map" class="empty-icon"></i><p>Select route stations and calculate.</p></div>`;
+            const tResults = document.getElementById("transit-results-body");
+            if (tResults) {
+                tResults.innerHTML = `<div class="empty-state"><i data-lucide="map" class="empty-icon"></i><p>Select route stations and calculate.</p></div>`;
+            }
             if (window.lucide) lucide.createIcons();
         }
 
