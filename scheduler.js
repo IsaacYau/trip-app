@@ -5675,34 +5675,42 @@ if (typeof document !== 'undefined') {
                         }
 
                         if (data.destination) {
-                            state.destination = data.destination.toLowerCase();
-                            localStorage.setItem("travelDestination", state.destination);
-                            const destSelect = document.getElementById("destination-select");
-                            if (destSelect) {
-                                destSelect.value = state.destination;
+                            const newDest = data.destination.toLowerCase();
+                            if (state.destination !== newDest) {
+                                state.destination = newDest;
+                                localStorage.setItem("travelDestination", state.destination);
+                                const destSelect = document.getElementById("destination-select");
+                                if (destSelect) {
+                                    destSelect.value = state.destination;
+                                }
+                                
+                                updateDestinationUI();
+
+                                // Clear map layers and reset inputs safely ONLY when destination changes
+                                if (typeof transitMarkersGroup !== 'undefined' && transitMarkersGroup) transitMarkersGroup.clearLayers();
+                                if (typeof transitPolylineGroup !== 'undefined' && transitPolylineGroup) transitPolylineGroup.clearLayers();
+                                if (transitStart) transitStart.value = "";
+                                if (transitEnd) transitEnd.value = "";
+                                if (transitStartCoords) transitStartCoords.value = "";
+                                if (transitEndCoords) transitEndCoords.value = "";
+                                if (transitResultsBody) {
+                                    transitResultsBody.innerHTML = `<div class="empty-state"><i data-lucide="map" class="empty-icon"></i><p>Select route stations and calculate.</p></div>`;
+                                    if (window.lucide) lucide.createIcons();
+                                }
+
+                                // Reset places tab UI and filters ONLY when destination changes
+                                if (pSearch) pSearch.value = "";
+                                if (pCity) pCity.value = "All";
+                                populateCityDropdown();
+                                renderPlacesGrid();
                             }
                         }
                         
-                        updateDestinationUI();
-                        saveICCardsToStorage();
-
-                        // Clear map layers and reset inputs safely
-                        if (typeof transitMarkersGroup !== 'undefined' && transitMarkersGroup) transitMarkersGroup.clearLayers();
-                        if (typeof transitPolylineGroup !== 'undefined' && transitPolylineGroup) transitPolylineGroup.clearLayers();
-                        if (transitStart) transitStart.value = "";
-                        if (transitEnd) transitEnd.value = "";
-                        if (transitStartCoords) transitStartCoords.value = "";
-                        if (transitEndCoords) transitEndCoords.value = "";
-                        if (transitResultsBody) {
-                            transitResultsBody.innerHTML = `<div class="empty-state"><i data-lucide="map" class="empty-icon"></i><p>Select route stations and calculate.</p></div>`;
-                            if (window.lucide) lucide.createIcons();
-                        }
-
-                        // Reset places tab UI and filters
-                        if (pSearch) pSearch.value = "";
-                        if (pCity) pCity.value = "All";
-                        populateCityDropdown();
-                        renderPlacesGrid();
+                        // Save synced IC cards and cash balances to LocalStorage only (do not write back to Firestore)
+                        const icKey = groupId === "TRIP-2026" ? "travelICCards" : `travelICCards_${groupId}`;
+                        localStorage.setItem(icKey, JSON.stringify(state.icCards));
+                        const cashKey = groupId === "TRIP-2026" ? "travelCashBalances" : `travelCashBalances_${groupId}`;
+                        localStorage.setItem(cashKey, JSON.stringify(state.cashBalances));
 
                         if (window.setupUserLocationTracking) {
                             window.setupUserLocationTracking();
