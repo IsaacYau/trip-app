@@ -2820,3 +2820,18 @@ textarea:focus {
     background: var(--accent-light);
     color: var(--text-primary);
 }
+
+/* Route details calculating spinner styles */
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.15);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border-left-color: var(--accent);
+    animation: spin 1s linear infinite;
+    margin: 1.5rem auto 1rem auto;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
