@@ -329,6 +329,41 @@
                         </div>
                     </div>
 
+                    <!-- Daily Budget & Spend Analytics Dashboard -->
+                    <div class="ledger-analytics-dashboard" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border); padding: 0.8rem; border-radius: var(--radius-sm); margin-bottom: 1rem;">
+                        <!-- Row 1: Daily Budget Input & Alert Progress -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.6rem;">
+                            <span style="font-size:0.75rem; font-weight:750; color:var(--text-secondary);">Daily Budget Limit:</span>
+                            <div style="display:flex; align-items:center; gap:0.25rem;">
+                                <span style="font-size:0.75rem; font-weight:750; color:var(--text-primary);" id="budget-currency-symbol">¥</span>
+                                <input type="number" id="daily-budget-limit-input" placeholder="Set Limit" style="padding:0.2rem 0.4rem; font-size:0.75rem; width:80px; background:var(--bg-card-glass); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); text-align:right; outline:none;">
+                            </div>
+                        </div>
+
+                        <!-- Progress Indicator Bar -->
+                        <div id="budget-progress-container" style="margin-bottom:0.8rem; display:none;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.65rem; font-weight:700; margin-bottom:0.2rem;">
+                                <span id="budget-progress-text" style="color:var(--text-primary);">Spent: ¥0 / ¥0</span>
+                                <span id="budget-alert-badge" style="color:var(--success); font-weight:800;">🟢 Within Budget</span>
+                            </div>
+                            <div style="width:100%; height:6px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden;">
+                                <div id="budget-progress-bar" style="width:0%; height:100%; background:var(--success); transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: CSS Stacked Category Distribution Bar -->
+                        <div id="category-distribution-container" style="display:none;">
+                            <span style="font-size:0.65rem; font-weight:750; color:var(--text-secondary); display:block; margin-bottom:0.25rem;">Category Distribution:</span>
+                            <div id="category-stacked-bar" style="width:100%; height:8px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden; display:flex; margin-bottom:0.6rem;">
+                                <!-- Colored segments will be injected here dynamically -->
+                            </div>
+                            <!-- Legends / Pill Badges -->
+                            <div id="category-badges-legend" style="display:flex; gap:0.25rem; flex-wrap:wrap; font-size:0.65rem; color:var(--text-secondary);">
+                                <!-- Category badges with totals (e.g. 🍔 Food: ¥1200) -->
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Add Expense Form -->
                     <form id="expense-form" class="expense-form">
 

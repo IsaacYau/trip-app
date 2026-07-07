@@ -708,6 +708,15 @@ try {
     sandbox.window.setPinpoint('start', 34.685, 135.525, 'Osaka Station');
     console.log("✅ Interactive Map Action Shortcuts verified!");
 
+    // -------------------------------------------------------------------------
+    // TEST 25: Daily Budget & Spend Distribution Chart
+    // -------------------------------------------------------------------------
+    console.log("\n[Test 25] Testing Daily Budget & Spend Distribution Chart...");
+    assert.ok(mockDocument.getElementById("daily-budget-limit-input"));
+    assert.ok(mockDocument.getElementById("budget-progress-bar"));
+    assert.ok(mockDocument.getElementById("category-stacked-bar"));
+    console.log("✅ Daily Budget & Spend Distribution Chart verified!");
+
     console.log("\n🎉 ALL TESTS PASSED SUCCESSFULLY! ZERO BUGS DETECTED.");
 } catch (err) {
     console.error("\n❌ TEST FAILED:", err);

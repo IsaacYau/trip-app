@@ -1213,7 +1213,8 @@ if (typeof document !== 'undefined') {
                 Bob: { JPY: 2000, MYR: 50, CNY: 100, logs: [] },
                 Charlie: { JPY: 2000, MYR: 50, CNY: 100, logs: [] }
             },
-            showAllExpenses: false
+            showAllExpenses: false,
+            dailyBudgetLimit: 0
         };
 
         let placesDatabase = [];
@@ -1307,6 +1308,15 @@ if (typeof document !== 'undefined') {
                 state.cashBalances = {};
             }
 
+            // Load daily budget limit
+            const budgetKey = state.activeGroupId === "TRIP-2026" ? "travelDailyBudget" : `travelDailyBudget_${state.activeGroupId}`;
+            const storedBudget = localStorage.getItem(budgetKey);
+            if (storedBudget) {
+                state.dailyBudgetLimit = parseFloat(storedBudget) || 0;
+            } else {
+                state.dailyBudgetLimit = 0;
+            }
+
             // Set today's trip day based on destination timezone
             state.selectedExpenseDay = getTodayTripDay();
 
@@ -1358,6 +1368,18 @@ if (typeof document !== 'undefined') {
                     await updateDoc(docRef, { cashBalances: state.cashBalances });
                 } catch (err) {
                     console.error("Failed to sync Cash Balances to Firestore:", err);
+                }
+            }
+        }
+        async function saveDailyBudgetLimitToStorage() {
+            const budgetKey = state.activeGroupId === "TRIP-2026" ? "travelDailyBudget" : `travelDailyBudget_${state.activeGroupId}`;
+            localStorage.setItem(budgetKey, String(state.dailyBudgetLimit || 0));
+            if (state.activeGroupId && state.activeGroupId !== "TRIP-2026" && db) {
+                try {
+                    const docRef = doc(db, "trip_networks", state.activeGroupId);
+                    await updateDoc(docRef, { dailyBudgetLimit: state.dailyBudgetLimit || 0 });
+                } catch (err) {
+                    console.error("Failed to sync Daily Budget limit to Firestore:", err);
                 }
             }
         }
@@ -4802,6 +4824,16 @@ if (typeof document !== 'undefined') {
         expenseAmountInput.addEventListener("input", updateConvertedIndicator);
         expenseCurrencySelect.addEventListener("change", updateConvertedIndicator);
 
+        const dailyBudgetLimitInput = document.getElementById("daily-budget-limit-input");
+        if (dailyBudgetLimitInput) {
+            dailyBudgetLimitInput.addEventListener("input", () => {
+                const limit = parseFloat(dailyBudgetLimitInput.value);
+                state.dailyBudgetLimit = isNaN(limit) || limit <= 0 ? 0 : limit;
+                saveDailyBudgetLimitToStorage();
+                renderBudgetAndDistribution();
+            });
+        }
+
         function updateConvertedIndicator() {
             const val = Number(expenseAmountInput.value);
             if (isNaN(val) || val <= 0) { expenseConvertedText.textContent = "Converted: HKD $0.00"; return; }
@@ -4809,7 +4841,127 @@ if (typeof document !== 'undefined') {
             expenseConvertedText.textContent = `Converted: HKD $${hkd}`;
         }
 
+        function renderBudgetAndDistribution() {
+            const currency = state.destination === "japan" ? "JPY" : (state.destination === "malaysia" ? "MYR" : "CNY");
+            const symbol = state.destination === "japan" ? "¥" : (state.destination === "malaysia" ? "RM" : "¥");
+
+            const symbolEl = document.getElementById("budget-currency-symbol");
+            if (symbolEl) symbolEl.textContent = symbol;
+
+            const limitInput = document.getElementById("daily-budget-limit-input");
+            if (limitInput) {
+                if (document.activeElement !== limitInput) {
+                    limitInput.value = state.dailyBudgetLimit || "";
+                }
+            }
+
+            const progressContainer = document.getElementById("budget-progress-container");
+            const progressText = document.getElementById("budget-progress-text");
+            const alertBadge = document.getElementById("budget-alert-badge");
+            const progressBar = document.getElementById("budget-progress-bar");
+
+            const distContainer = document.getElementById("category-distribution-container");
+            const stackedBar = document.getElementById("category-stacked-bar");
+            const badgesLegend = document.getElementById("category-badges-legend");
+
+            const selectedDate = state.selectedExpenseDay;
+            if (!selectedDate) {
+                if (progressContainer) progressContainer.style.display = "none";
+                if (distContainer) distContainer.style.display = "none";
+                return;
+            }
+
+            const targetNorm = normalizeToIsoDate(selectedDate);
+            let totalSpent = 0;
+            const categorySums = {};
+
+            state.expenses.forEach(exp => {
+                if (exp.isSettlement) return;
+                const dayKey = exp.day || exp.date || "Unknown";
+                if (normalizeToIsoDate(dayKey) === targetNorm) {
+                    const amount = Number(exp.amount) || 0;
+                    totalSpent += amount;
+                    const cat = exp.category || "Miscellaneous";
+                    categorySums[cat] = (categorySums[cat] || 0) + amount;
+                }
+            });
+
+            // 1. Render Daily Budget Progress Bar
+            if (!state.dailyBudgetLimit || state.dailyBudgetLimit <= 0) {
+                if (progressContainer) progressContainer.style.display = "none";
+            } else {
+                if (progressContainer) progressContainer.style.display = "block";
+                const percent = (totalSpent / state.dailyBudgetLimit) * 100;
+                if (progressText) {
+                    progressText.textContent = `Spent: ${symbol}${totalSpent.toFixed(0)} / ${symbol}${state.dailyBudgetLimit.toFixed(0)}`;
+                }
+
+                if (progressBar) {
+                    progressBar.style.width = Math.min(100, percent) + "%";
+                    if (percent < 80) {
+                        progressBar.style.background = "var(--success)";
+                    } else if (percent <= 100) {
+                        progressBar.style.background = "var(--warning)";
+                    } else {
+                        progressBar.style.background = "var(--danger)";
+                    }
+                }
+
+                if (alertBadge) {
+                    if (percent <= 100) {
+                        alertBadge.textContent = "🟢 Within Budget";
+                        alertBadge.style.color = "var(--success)";
+                    } else {
+                        const excess = totalSpent - state.dailyBudgetLimit;
+                        alertBadge.textContent = `🔴 Exceeded (+${symbol}${excess.toFixed(0)})`;
+                        alertBadge.style.color = "var(--danger)";
+                    }
+                }
+            }
+
+            // 2. Render Stacked Category Spend Chart
+            if (totalSpent <= 0) {
+                if (distContainer) distContainer.style.display = "none";
+            } else {
+                if (distContainer) distContainer.style.display = "block";
+                
+                const chartCategoryColors = {
+                    Food: "#CA8A04",
+                    Sights: "#0EA5E9",
+                    Shopping: "#A855F7",
+                    Entertainment: "#22C55E",
+                    Transport: "#dd6b20",
+                    Hotel: "#ec4899",
+                    Miscellaneous: "#718096"
+                };
+
+                let segmentsHtml = "";
+                let legendHtml = "";
+
+                // Sort categories by sum descending to look extremely clean and structured
+                const sortedCategories = Object.entries(categorySums).sort((a, b) => b[1] - a[1]);
+
+                sortedCategories.forEach(([cat, sum]) => {
+                    const percent = (sum / totalSpent) * 100;
+                    const color = chartCategoryColors[cat] || chartCategoryColors.Miscellaneous;
+                    segmentsHtml += `
+                        <div style="width: ${percent}%; height: 100%; background-color: ${color};" title="${escapeHtml(cat)}: ${symbol}${sum.toFixed(0)} (${percent.toFixed(0)}%)"></div>
+                    `;
+                    legendHtml += `
+                        <span style="display:inline-flex; align-items:center; gap:0.25rem; background:rgba(255,255,255,0.03); border:1px solid var(--border); padding:0.15rem 0.4rem; border-radius:var(--radius-sm); font-size:0.65rem;">
+                            <span style="display:inline-block; width:6px; height:6px; background-color:${color}; border-radius:50%;"></span>
+                            <strong>${escapeHtml(cat)}:</strong> ${symbol}${sum.toFixed(0)} (${percent.toFixed(0)}%)
+                        </span>
+                    `;
+                });
+
+                if (stackedBar) stackedBar.innerHTML = segmentsHtml;
+                if (badgesLegend) badgesLegend.innerHTML = legendHtml;
+            }
+        }
+
         function renderLedger() {
+            renderBudgetAndDistribution();
             expensesList.innerHTML = "";
             if (state.expenses.length === 0) {
                 expensesList.innerHTML = `<div class="empty-state"><i data-lucide="receipt" class="empty-icon"></i><p>No trip expenses recorded.</p></div>`;
@@ -5710,6 +5862,7 @@ if (typeof document !== 'undefined') {
                         state.expenses = data.expenses || [];
                         state.icCards = data.icCards || {};
                         state.cashBalances = data.cashBalances || {};
+                        state.dailyBudgetLimit = parseFloat(data.dailyBudgetLimit) || 0;
 
                         // Extract group members from member names array (if stored in Firestore)
                         if (data.memberNames && data.memberNames.length > 0) {
@@ -5759,11 +5912,13 @@ if (typeof document !== 'undefined') {
                             }
                         }
                         
-                        // Save synced IC cards and cash balances to LocalStorage only (do not write back to Firestore)
+                        // Save synced IC cards, cash balances and daily budget to LocalStorage only (do not write back to Firestore)
                         const icKey = groupId === "TRIP-2026" ? "travelICCards" : `travelICCards_${groupId}`;
                         localStorage.setItem(icKey, JSON.stringify(state.icCards));
                         const cashKey = groupId === "TRIP-2026" ? "travelCashBalances" : `travelCashBalances_${groupId}`;
                         localStorage.setItem(cashKey, JSON.stringify(state.cashBalances));
+                        const budgetKey = groupId === "TRIP-2026" ? "travelDailyBudget" : `travelDailyBudget_${groupId}`;
+                        localStorage.setItem(budgetKey, String(state.dailyBudgetLimit || 0));
 
                         if (window.setupUserLocationTracking) {
                             window.setupUserLocationTracking();
