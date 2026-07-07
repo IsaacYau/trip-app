@@ -5509,6 +5509,12 @@ if (typeof document !== 'undefined') {
             const transitEndCoords = document.getElementById("transit-end-coords");
             const pSearch = document.getElementById("places-search");
             const pCity = document.getElementById("places-city-select");
+            const calcBtn = document.getElementById("transit-calc-btn");
+
+            if (calcBtn) {
+                calcBtn.disabled = false;
+                calcBtn.innerHTML = `<i data-lucide="navigation"></i> Calculate Route`;
+            }
 
             if (transitStart) transitStart.value = "";
             if (transitEnd) transitEnd.value = "";
