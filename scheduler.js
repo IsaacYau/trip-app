@@ -4371,8 +4371,11 @@ if (typeof document !== 'undefined') {
                     updateIcEstimator();
                     showToast("🚇 IC Card Recharged", `Added ${symbol}${rechargeAmt.toFixed(0)} to ${state.activeUser}'s balance.`);
                     
-                    // Trigger transit form submission again to update UI and hide warning banner!
-                    transitForm.dispatchEvent(new Event("submit"));
+                    // Remove the warning card from the DOM since the balance has been recharged!
+                    const warningCard = document.querySelector('.warning-card-premium');
+                    if (warningCard) {
+                        warningCard.remove();
+                    }
                 });
             }
 
