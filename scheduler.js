@@ -4207,6 +4207,26 @@ if (typeof document !== 'undefined') {
                 `;
             }
 
+            let warningCardHtml = "";
+            const currentBalance = state.icCards[state.activeUser] ? (state.icCards[state.activeUser][currency] || 0) : 0;
+            if (showTransitRoute && currentBalance < transitFareTotal) {
+                warningCardHtml = `
+                    <div class="card warning-card-premium" style="margin-top:0.8rem; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); padding:0.8rem; border-radius:var(--radius-sm);">
+                        <div style="display:flex; align-items:center; gap:0.5rem; color:var(--danger); font-size:0.75rem; font-weight:750;">
+                            <i data-lucide="alert-triangle" style="width:14px; height:14px;"></i>
+                            <span>Insufficient IC Balance Warning</span>
+                        </div>
+                        <p style="font-size:0.7rem; margin:0.25rem 0 0.5rem 0; color:var(--text-secondary);">
+                            ${escapeHtml(state.activeUser)} has <strong>${symbol}${currentBalance.toFixed(0)}</strong>, but this route requires <strong>${symbol}${transitFareTotal.toFixed(0)}</strong>.
+                        </p>
+                        <div style="display:flex; gap:0.4rem; align-items:center;">
+                            <input type="number" id="inline-recharge-amount" placeholder="Recharge Amt" value="${Math.ceil(transitFareTotal - currentBalance)}" style="padding:0.25rem 0.55rem; font-size:0.8rem; width:110px; background:var(--bg-card-glass); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); outline:none;">
+                            <button type="button" class="btn btn-accent btn-sm" id="inline-recharge-btn" style="padding:0.35rem 0.55rem; font-size:0.8rem;">⚡ Recharge</button>
+                        </div>
+                    </div>
+                `;
+            }
+
             const transitMetricsHtml = (!showTransitRoute) ? "" : `
                 <div class="transit-metrics" style="background: var(--bg-card); padding: 0.8rem; border-radius: var(--radius-sm); margin-top: 0.8rem; border: 1px solid var(--border);">
                     <div>Total Duration: <strong>${transitTimeTotal} mins</strong></div>
@@ -4214,6 +4234,7 @@ if (typeof document !== 'undefined') {
                     <div>Fare: <strong>${symbol}${transitFareTotal.toFixed(0)}</strong> <span style="font-size:0.7rem; color:var(--text-secondary)">(HKD $${transitHkd})</span></div>
                     ${disclaimerHtml}
                 </div>
+                ${warningCardHtml}
                 <button class="btn btn-accent btn-block" style="margin-top:0.8rem;" id="charge-ic-transit-btn"><i data-lucide="credit-card"></i> Add transit fare to ${state.activeUser}</button>
             `;
 
@@ -4304,6 +4325,51 @@ if (typeof document !== 'undefined') {
                     saveICCardsToStorage();
                     updateIcEstimator();
                     showToast("🚇 Fares Charged", `Deducted ${symbol}${transitFareTotal.toFixed(2)} from ${state.activeUser}'s transit balance.`);
+                });
+            }
+
+            // Inline recharge listener
+            const inlineRechargeBtn = document.getElementById("inline-recharge-btn");
+            if (inlineRechargeBtn) {
+                inlineRechargeBtn.addEventListener("click", () => {
+                    const amountInput = document.getElementById("inline-recharge-amount");
+                    const rechargeAmt = parseFloat(amountInput.value);
+                    if (isNaN(rechargeAmt) || rechargeAmt <= 0) {
+                        alert("Please enter a valid positive recharge amount.");
+                        return;
+                    }
+                    if (!state.icCards[state.activeUser]) {
+                        state.icCards[state.activeUser] = { JPY: 2000, MYR: 50, CNY: 100, logs: [] };
+                    }
+                    state.icCards[state.activeUser][currency] = (state.icCards[state.activeUser][currency] || 0) + rechargeAmt;
+                    
+                    // Deduct from cash balance (mirroring standard IC card top-up in Wallet tab)
+                    deductCashBalance(state.activeUser, rechargeAmt, currency);
+                    
+                    // Add expense log
+                    const exp = {
+                        id: `exp-${Date.now()}`,
+                        title: `IC Card Recharge (${state.activeUser})`,
+                        amount: rechargeAmt,
+                        currency,
+                        payer: state.activeUser,
+                        category: "Transport",
+                        type: "local",
+                        day: getTodayTripDay(),
+                        date: getTodayTripDay(),
+                        paymentMethod: { type: "cash", subType: null }
+                    };
+                    state.expenses.push(exp);
+                    saveExpensesToStorage();
+                    renderLedger();
+                    renderDebtSettlement();
+
+                    saveICCardsToStorage();
+                    updateIcEstimator();
+                    showToast("🚇 IC Card Recharged", `Added ${symbol}${rechargeAmt.toFixed(0)} to ${state.activeUser}'s balance.`);
+                    
+                    // Trigger transit form submission again to update UI and hide warning banner!
+                    transitForm.dispatchEvent(new Event("submit"));
                 });
             }
 
