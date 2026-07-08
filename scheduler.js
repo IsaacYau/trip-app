@@ -485,9 +485,11 @@ function calculateJapanTransitFare(itinerary) {
     return totalFare;
 }
 
+const OTP_BASE_URL = "http://150.230.3.107:8080";
+
 async function fetchOtpTransitRoute(startLocCoords, endLocCoords) {
     try {
-        const url = `http://150.230.3.107:8080/otp/routers/default/plan?fromPlace=${startLocCoords.lat},${startLocCoords.lon}&toPlace=${endLocCoords.lat},${endLocCoords.lon}&mode=TRANSIT,WALK`;
+        const url = `${OTP_BASE_URL}/otp/routers/default/plan?fromPlace=${startLocCoords.lat},${startLocCoords.lon}&toPlace=${endLocCoords.lat},${endLocCoords.lon}&mode=TRANSIT,WALK`;
         const response = await fetch(url);
         if (!response.ok) return null;
         const data = await response.json();
@@ -639,7 +641,7 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
         if (mode === "bicycle") otpMode = "BICYCLE";
         else if (mode === "driving") otpMode = "CAR";
         
-        let res = await queryUrl(`http://150.230.3.107:8080/otp/routers/default/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`);
+        let res = await queryUrl(`${OTP_BASE_URL}/otp/routers/default/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`);
         if (res) return res;
         
         const testOrsKey = (typeof localStorage !== 'undefined') ? localStorage.getItem("ROAMREADY_ORS_KEY") : "";
@@ -668,7 +670,7 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     if (mode === "bicycle") otpMode = "BICYCLE";
     else if (mode === "driving") otpMode = "CAR";
     
-    let res = await queryUrl(`http://150.230.3.107:8080/otp/routers/default/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`);
+    let res = await queryUrl(`${OTP_BASE_URL}/otp/routers/default/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`);
     if (res) return res;
 
     const orsKey = (typeof localStorage !== 'undefined') ? (localStorage.getItem("ROAMREADY_ORS_KEY") || "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=") : "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=";
@@ -3595,6 +3597,7 @@ if (typeof document !== 'undefined') {
             transitMarkersGroup.clearLayers();
             transitPolylineGroup.clearLayers();
             renderStaticStations();
+            loadStationsFromOtp();
         }
 
         function renderStaticStations() {
@@ -3623,6 +3626,31 @@ if (typeof document !== 'undefined') {
                     weight: 2 
                 }).addTo(staticStationsGroup).bindPopup(popupHtml);
             });
+        }
+
+        async function loadStationsFromOtp() {
+            if (typeof fetch === 'undefined') return;
+            try {
+                const res = await fetch(`${OTP_BASE_URL}/otp/routers/default/index/stops`);
+                if (!res.ok) return;
+                const stops = await res.json();
+                if (Array.isArray(stops) && stops.length > 0) {
+                    const coords = {};
+                    const nodes = [];
+                    stops.forEach(stop => {
+                        if (stop.name && stop.lat && stop.lon) {
+                            coords[stop.name] = { lat: stop.lat, lon: stop.lon };
+                            nodes.push(stop.name);
+                        }
+                    });
+                    TRANSIT_NETWORKS[state.destination].coordinates = coords;
+                    TRANSIT_NETWORKS[state.destination].nodes = nodes;
+                    renderStaticStations();
+                    console.log(`Loaded ${stops.length} stations dynamically from OTP server!`);
+                }
+            } catch (err) {
+                console.warn("Could not load stops from OTP server index API:", err);
+            }
         }
 
         function findNearestStation(lat, lon, destination) {
