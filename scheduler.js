@@ -202,8 +202,10 @@ function findDijkstraRoute(destination, start, end, criteria, travelDate, travel
     const adj = {};
     nodes.forEach(n => adj[n] = []);
     links.forEach(l => {
-        adj[l.u].push({ node: l.v, time: l.time, fare: l.fare, line: l.line, color: l.color, schedule: l.schedule, type: l.type });
-        adj[l.v].push({ node: l.u, time: l.time, fare: l.fare, line: l.line, color: l.color, schedule: l.schedule, type: l.type });
+        if (adj[l.u] && adj[l.v]) {
+            adj[l.u].push({ node: l.v, time: l.time, fare: l.fare, line: l.line, color: l.color, schedule: l.schedule, type: l.type });
+            adj[l.v].push({ node: l.u, time: l.time, fare: l.fare, line: l.line, color: l.color, schedule: l.schedule, type: l.type });
+        }
     });
 
     const dist = {};
@@ -485,19 +487,24 @@ function calculateJapanTransitFare(itinerary) {
     return totalFare;
 }
 
-function getOtpPlanUrl(startCoord, endCoord, otpMode) {
+function getOtpPlanUrl(startCoord, endCoord, otpMode, travelDate, travelTime) {
     const isJapan = (startCoord.lat > 20);
     const port = isJapan ? 8080 : 8081;
     const router = isJapan ? "japan" : "malaysia";
-    return `http://150.230.3.107:${port}/otp/routers/${router}/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`;
+    let url = `http://150.230.3.107:${port}/otp/routers/${router}/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`;
+    if (travelDate) url += `&date=${travelDate}`;
+    if (travelTime) url += `&time=${travelTime}`;
+    return url;
 }
 
-async function fetchOtpTransitRoute(startLocCoords, endLocCoords) {
+async function fetchOtpTransitRoute(startLocCoords, endLocCoords, travelDate, travelTime) {
     try {
         const isJapan = (startLocCoords.lat > 20);
         const port = isJapan ? 8080 : 8081;
         const router = isJapan ? "japan" : "malaysia";
-        const url = `http://150.230.3.107:${port}/otp/routers/${router}/plan?fromPlace=${startLocCoords.lat},${startLocCoords.lon}&toPlace=${endLocCoords.lat},${endLocCoords.lon}&mode=TRANSIT,WALK`;
+        let url = `http://150.230.3.107:${port}/otp/routers/${router}/plan?fromPlace=${startLocCoords.lat},${startLocCoords.lon}&toPlace=${endLocCoords.lat},${endLocCoords.lon}&mode=TRANSIT,WALK`;
+        if (travelDate) url += `&date=${travelDate}`;
+        if (travelTime) url += `&time=${travelTime}`;
         const response = await fetch(url);
         if (!response.ok) return null;
         const data = await response.json();
@@ -3616,6 +3623,10 @@ if (typeof document !== 'undefined') {
             if (!network || !network.coordinates) return;
 
             Object.entries(network.coordinates).forEach(([stationName, coords]) => {
+                if (state.destination === "malaysia") {
+                    const isRail = /\b(LRT|MRT|KTM|Monorail|Stesen|Sentral|Komuter|Transit|Terminal)\b/i.test(stationName);
+                    if (!isRail) return; // skip bus stops
+                }
                 const escapedStation = escapeHtml(stationName).replace(/'/g, "\\'");
                 const popupHtml = `
                     <div style="font-family:var(--font-primary); padding: 0.2rem; min-width: 140px; text-align: center;">
@@ -3883,8 +3894,8 @@ if (typeof document !== 'undefined') {
             const travelTime = document.getElementById("transit-travel-time") ? document.getElementById("transit-travel-time").value : "12:00";
             
             let route;
-            if (state.destination === "japan") {
-                route = await fetchOtpTransitRoute(startLocCoords, endLocCoords);
+            if (state.destination === "japan" || state.destination === "malaysia") {
+                route = await fetchOtpTransitRoute(startLocCoords, endLocCoords, travelDate, travelTime);
                 if (typeof calculationGroupId !== 'undefined' && calculationGroupId !== state.activeGroupId) return;
             } else {
                 const routeFastest = findDijkstraRoute(state.destination, startStationName, endStationName, "time", travelDate, travelTime);
