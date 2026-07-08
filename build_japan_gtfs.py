@@ -9,7 +9,7 @@ import re
 
 # Bounding box for Nagoya, Osaka, Kobe, Kyoto
 # format: (min_lat, min_lon, max_lat, max_lon)
-BBOX = "34.5,135.0,35.5,137.2"
+BBOX = "34.0,134.0,36.5,140.8"
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 
@@ -223,7 +223,7 @@ def build_japan_gtfs():
     }]
 
     # Write to zip file
-    zip_filename = "japan_rail.zip"
+    zip_filename = "japan_rail_v2.zip"
     print(f"Creating {zip_filename}...")
     
     with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
