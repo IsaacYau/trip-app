@@ -487,6 +487,35 @@ function calculateJapanTransitFare(itinerary) {
     return totalFare;
 }
 
+function calculateMalaysiaTransitFare(itinerary) {
+    if (!itinerary || !itinerary.legs) return 0;
+    let totalFare = 0;
+    let currentAgency = null;
+
+    itinerary.legs.forEach(leg => {
+        if (leg.transitLeg && leg.route && leg.agencyName) {
+            const agency = leg.agencyName.toLowerCase();
+            const dist = (leg.distance || 0) / 1000;
+
+            if (currentAgency !== agency) {
+                currentAgency = agency;
+                if (agency.includes("bus")) {
+                    totalFare += 1.00;
+                } else {
+                    totalFare += 1.20;
+                }
+            }
+
+            if (agency.includes("bus")) {
+                totalFare += dist * 0.10;
+            } else {
+                totalFare += dist * 0.15;
+            }
+        }
+    });
+    return parseFloat(totalFare.toFixed(2));
+}
+
 function getOtpPlanUrl(startCoord, endCoord, otpMode, travelDate, travelTime) {
     const isJapan = (startCoord.lat > 20);
     const port = isJapan ? 8080 : 8081;
@@ -510,7 +539,7 @@ async function fetchOtpTransitRoute(startLocCoords, endLocCoords, travelDate, tr
         const data = await response.json();
         if (data.plan && data.plan.itineraries && data.plan.itineraries.length > 0) {
             const itin = data.plan.itineraries[0];
-            const fare = calculateJapanTransitFare(itin);
+            const fare = isJapan ? calculateJapanTransitFare(itin) : calculateMalaysiaTransitFare(itin);
             const segmentLinks = [];
             let transfers = 0;
             let lastLine = null;
@@ -3920,7 +3949,13 @@ if (typeof document !== 'undefined') {
             const travelTime = document.getElementById("transit-travel-time") ? document.getElementById("transit-travel-time").value : "12:00";
             
             let route;
-            if (state.destination === "japan" || state.destination === "malaysia") {
+            const [hours, minutes] = travelTime.split(":").map(Number);
+            const totalMins = hours * 60 + minutes;
+            const isMidnightShutdown = totalMins >= 0 && totalMins < 300; // 12:00 AM to 5:00 AM
+
+            if (isMidnightShutdown) {
+                route = { shutdown: true };
+            } else if (state.destination === "japan" || state.destination === "malaysia") {
                 route = await fetchOtpTransitRoute(startLocCoords, endLocCoords, travelDate, travelTime);
                 if (typeof calculationGroupId !== 'undefined' && calculationGroupId !== state.activeGroupId) return;
             } else {
@@ -4012,7 +4047,7 @@ if (typeof document !== 'undefined') {
                 transitTimeTotal = 0;
                 transitFareTotal = 0;
                 transitTransfers = 0;
-            } else if (state.destination === "japan") {
+            } else if (state.destination === "japan" || state.destination === "malaysia") {
                 if (!route || !route.itinerary) {
                     transitTimelineHtml = `
                         <div style="background: var(--bg-card); border: 1px solid var(--border); padding: 1.2rem; border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-primary); text-align: center; margin-bottom: 1rem; backdrop-filter: blur(8px);">
@@ -4251,7 +4286,7 @@ if (typeof document !== 'undefined') {
             function renderProfileOnMap(profile) {
                 transitPolylineGroup.clearLayers();
                 if (profile === "transit") {
-                    if (state.destination === "japan") {
+                    if (state.destination === "japan" || state.destination === "malaysia") {
                         if (route && route.itinerary && route.itinerary.legs) {
                             route.itinerary.legs.forEach(leg => {
                                 if (leg.legGeometry && leg.legGeometry.points) {
@@ -4301,7 +4336,7 @@ if (typeof document !== 'undefined') {
             const walkArrival = addMinutesToTime(travelTime, walkTime);
 
             // Determine the Recommended Mode based on criteria
-            const showTransitRoute = (state.destination === "japan" && route && route.itinerary) || (state.destination !== "japan" && startStationName !== endStationName && route && !route.shutdown);
+            const showTransitRoute = ((state.destination === "japan" || state.destination === "malaysia") && route && route.itinerary) || (state.destination !== "japan" && state.destination !== "malaysia" && startStationName !== endStationName && route && !route.shutdown);
 
             const modesList = [];
             if (showTransitRoute) {
