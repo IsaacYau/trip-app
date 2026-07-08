@@ -490,26 +490,76 @@ function calculateJapanTransitFare(itinerary) {
 function calculateMalaysiaTransitFare(itinerary) {
     if (!itinerary || !itinerary.legs) return 0;
     let totalFare = 0;
-    let currentAgency = null;
 
     itinerary.legs.forEach(leg => {
-        if (leg.transitLeg && leg.route && leg.agencyName) {
-            const agency = leg.agencyName.toLowerCase();
+        if (leg.transitLeg) {
+            const agency = (leg.agencyName || "").toLowerCase();
+            const route = (leg.route || leg.routeLongName || leg.routeShortName || "").toLowerCase();
+            const fromName = (leg.from.name || "").toLowerCase();
+            const toName = (leg.to.name || "").toLowerCase();
             const dist = (leg.distance || 0) / 1000;
+            const numStations = leg.intermediateStops ? leg.intermediateStops.length + 1 : 1;
 
-            if (currentAgency !== agency) {
-                currentAgency = agency;
-                if (agency.includes("bus")) {
-                    totalFare += 1.00;
+            // 1. KLIA Ekspres
+            if (agency.includes("klia") || route.includes("ekspres") || route.includes("express")) {
+                if ((fromName.includes("sentral") && (toName.includes("klia") || toName.includes("klia2"))) ||
+                    (toName.includes("sentral") && (fromName.includes("klia") || fromName.includes("klia2")))) {
+                    totalFare += 35.00;
+                } else if ((fromName.includes("sentral") && toName.includes("salak")) ||
+                           (toName.includes("sentral") && fromName.includes("salak"))) {
+                    totalFare += 10.00;
                 } else {
-                    totalFare += 1.20;
+                    totalFare += 35.00;
                 }
             }
-
-            if (agency.includes("bus")) {
-                totalFare += dist * 0.10;
-            } else {
-                totalFare += dist * 0.15;
+            // 2. KTM Komuter
+            else if (agency.includes("ktm") || agency.includes("ktmb") || route.includes("komuter")) {
+                if ((fromName.includes("sentral") && toName.includes("midvalley")) ||
+                    (toName.includes("sentral") && fromName.includes("midvalley"))) {
+                    totalFare += 1.00;
+                } else if ((fromName.includes("sentral") && toName.includes("subang")) ||
+                           (toName.includes("sentral") && fromName.includes("subang"))) {
+                    totalFare += 2.30;
+                } else if ((fromName.includes("sentral") && toName.includes("klang")) ||
+                           (toName.includes("sentral") && fromName.includes("klang"))) {
+                    totalFare += 5.00;
+                } else if ((fromName.includes("sentral") && toName.includes("batu")) ||
+                           (toName.includes("sentral") && fromName.includes("batu"))) {
+                    totalFare += 2.60;
+                } else if ((fromName.includes("sentral") && toName.includes("port klang")) ||
+                           (toName.includes("sentral") && fromName.includes("port klang"))) {
+                    totalFare += 5.60;
+                } else if ((fromName.includes("sentral") && toName.includes("tanjung malim")) ||
+                           (toName.includes("sentral") && fromName.includes("tanjung malim"))) {
+                    totalFare += 10.60;
+                } else {
+                    totalFare += Math.min(10.60, 1.00 + dist * 0.15);
+                }
+            }
+            // 3. BRT Sunway Line
+            else if (route.includes("brt") || agency.includes("sunway")) {
+                totalFare += 0.70;
+            }
+            // 4. Rapid KL Bus
+            else if (leg.mode && leg.mode.toLowerCase() === "bus") {
+                if (fromName.includes("gombak") || fromName.includes("rawang") || 
+                    toName.includes("gombak") || toName.includes("rawang")) {
+                    totalFare += 2.00; // Outskirt feeder median
+                } else {
+                    totalFare += 1.00; // Flat fare
+                }
+            }
+            // 5. Rapid KL Rail (LRT + MRT + Monorail)
+            else {
+                let legFare = 0;
+                if (numStations <= 3) {
+                    legFare = 1.50; // Median of 1.00-2.00
+                } else if (numStations <= 8) {
+                    legFare = 3.00; // Median of 2.00-4.00
+                } else {
+                    legFare = 5.50; // Median of 4.50-6.50
+                }
+                totalFare += Math.min(9.50, legFare);
             }
         }
     });
