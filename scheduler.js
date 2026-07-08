@@ -514,6 +514,7 @@ async function fetchOtpTransitRoute(startLocCoords, endLocCoords, travelDate, tr
             const segmentLinks = [];
             let transfers = 0;
             let lastLine = null;
+            const path = [];
             
             itin.legs.forEach(leg => {
                 if (leg.transitLeg) {
@@ -526,6 +527,10 @@ async function fetchOtpTransitRoute(startLocCoords, endLocCoords, travelDate, tr
                         v: leg.to.name,
                         type: leg.mode.toLowerCase()
                     });
+                    if (path.length === 0) {
+                        path.push(leg.from.name);
+                    }
+                    path.push(leg.to.name);
                     if (lastLine && lastLine !== leg.route) {
                         transfers++;
                     }
@@ -538,6 +543,7 @@ async function fetchOtpTransitRoute(startLocCoords, endLocCoords, travelDate, tr
                 totalFare: fare,
                 transfers,
                 segmentLinks,
+                path,
                 itinerary: itin
             };
         }
@@ -2768,6 +2774,17 @@ if (typeof document !== 'undefined') {
             saveICCardsToStorage();
         });
 
+        const filterRail = document.getElementById("ml-filter-rail");
+        const filterBus = document.getElementById("ml-filter-bus");
+        if (filterRail && filterBus) {
+            filterRail.addEventListener("change", () => {
+                renderStaticStations();
+            });
+            filterBus.addEventListener("change", () => {
+                renderStaticStations();
+            });
+        }
+
         // -------------------------------------------------------------------------
         // CALENDAR MONTH NAVIGATION
         // -------------------------------------------------------------------------
@@ -3619,13 +3636,22 @@ if (typeof document !== 'undefined') {
             if (typeof L === 'undefined' || !transitMapObj || !staticStationsGroup) return;
             staticStationsGroup.clearLayers();
 
+            const mlFilters = document.getElementById("ml-map-filters");
+            if (mlFilters) {
+                mlFilters.style.display = state.destination === "malaysia" ? "flex" : "none";
+            }
+
             const network = TRANSIT_NETWORKS[state.destination];
             if (!network || !network.coordinates) return;
 
             Object.entries(network.coordinates).forEach(([stationName, coords]) => {
                 if (state.destination === "malaysia") {
                     const isRail = /\b(LRT|MRT|KTM|Monorail|Stesen|Sentral|Komuter|Transit|Terminal)\b/i.test(stationName);
-                    if (!isRail) return; // skip bus stops
+                    const showRail = document.getElementById("ml-filter-rail") ? document.getElementById("ml-filter-rail").checked : true;
+                    const showBus = document.getElementById("ml-filter-bus") ? document.getElementById("ml-filter-bus").checked : false;
+                    
+                    if (isRail && !showRail) return;
+                    if (!isRail && !showBus) return;
                 }
                 const escapedStation = escapeHtml(stationName).replace(/'/g, "\\'");
                 const popupHtml = `
@@ -4142,7 +4168,9 @@ if (typeof document !== 'undefined') {
                         const uCoords = network.coordinates[route.path[i]];
                         const vCoords = network.coordinates[nextStation];
 
-                        transitPathCoords.push({ coords: [[uCoords.lat, uCoords.lon], [vCoords.lat, vCoords.lon]], color: link.color });
+                        if (uCoords && vCoords) {
+                            transitPathCoords.push({ coords: [[uCoords.lat, uCoords.lon], [vCoords.lat, vCoords.lon]], color: link.color });
+                        }
                         
                         const dep = addMinutesToTime(travelTime, currentMins);
                         const arr = addMinutesToTime(travelTime, currentMins + link.time);
