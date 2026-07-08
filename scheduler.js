@@ -485,11 +485,19 @@ function calculateJapanTransitFare(itinerary) {
     return totalFare;
 }
 
-const OTP_BASE_URL = "http://150.230.3.107:8080";
+function getOtpPlanUrl(startCoord, endCoord, otpMode) {
+    const isJapan = (startCoord.lat > 20);
+    const port = isJapan ? 8080 : 8081;
+    const router = isJapan ? "japan" : "malaysia";
+    return `http://150.230.3.107:${port}/otp/routers/${router}/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`;
+}
 
 async function fetchOtpTransitRoute(startLocCoords, endLocCoords) {
     try {
-        const url = `${OTP_BASE_URL}/otp/routers/default/plan?fromPlace=${startLocCoords.lat},${startLocCoords.lon}&toPlace=${endLocCoords.lat},${endLocCoords.lon}&mode=TRANSIT,WALK`;
+        const isJapan = (startLocCoords.lat > 20);
+        const port = isJapan ? 8080 : 8081;
+        const router = isJapan ? "japan" : "malaysia";
+        const url = `http://150.230.3.107:${port}/otp/routers/${router}/plan?fromPlace=${startLocCoords.lat},${startLocCoords.lon}&toPlace=${endLocCoords.lat},${endLocCoords.lon}&mode=TRANSIT,WALK`;
         const response = await fetch(url);
         if (!response.ok) return null;
         const data = await response.json();
@@ -641,7 +649,7 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
         if (mode === "bicycle") otpMode = "BICYCLE";
         else if (mode === "driving") otpMode = "CAR";
         
-        let res = await queryUrl(`${OTP_BASE_URL}/otp/routers/default/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`);
+        let res = await queryUrl(getOtpPlanUrl(startCoord, endCoord, otpMode));
         if (res) return res;
         
         const testOrsKey = (typeof localStorage !== 'undefined') ? localStorage.getItem("ROAMREADY_ORS_KEY") : "";
@@ -670,7 +678,7 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     if (mode === "bicycle") otpMode = "BICYCLE";
     else if (mode === "driving") otpMode = "CAR";
     
-    let res = await queryUrl(`${OTP_BASE_URL}/otp/routers/default/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`);
+    let res = await queryUrl(getOtpPlanUrl(startCoord, endCoord, otpMode));
     if (res) return res;
 
     const orsKey = (typeof localStorage !== 'undefined') ? (localStorage.getItem("ROAMREADY_ORS_KEY") || "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=") : "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZmUxMjY1NmFhYjQzMDU5MTc1YTlhMTlmMjczOTEyIiwiaCI6Im11cm11cjY0In0=";
@@ -3631,7 +3639,9 @@ if (typeof document !== 'undefined') {
         async function loadStationsFromOtp() {
             if (typeof fetch === 'undefined') return;
             try {
-                const res = await fetch(`${OTP_BASE_URL}/otp/routers/default/index/stops`);
+                const port = state.destination === "japan" ? 8080 : 8081;
+                const router = state.destination === "japan" ? "japan" : "malaysia";
+                const res = await fetch(`http://150.230.3.107:${port}/otp/routers/${router}/index/stops`);
                 if (!res.ok) return;
                 const stops = await res.json();
                 if (Array.isArray(stops) && stops.length > 0) {
