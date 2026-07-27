@@ -633,7 +633,7 @@ try {
     console.log("\n[Test 21] Testing OpenTripPlanner Response and Polyline Decoding...");
 
     sandbox.fetch = async (url, options) => {
-        if (url.includes("129.225.135.42")) {
+        if (url.includes("roamready-otp.duckdns.org")) {
             return {
                 ok: true,
                 json: async () => ({

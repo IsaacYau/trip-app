@@ -568,9 +568,9 @@ function calculateMalaysiaTransitFare(itinerary) {
 
 function getOtpPlanUrl(startCoord, endCoord, otpMode, travelDate, travelTime) {
     const isJapan = (startCoord.lat > 20);
-    const port = isJapan ? 8080 : 8081;
+    const proxyPath = isJapan ? "otp-japan" : "otp-malaysia";
     const router = isJapan ? "japan" : "malaysia";
-    let url = `http://129.225.135.42:${port}/otp/routers/${router}/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`;
+    let url = `https://roamready-otp.duckdns.org/${proxyPath}/routers/${router}/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`;
     if (travelDate) url += `&date=${travelDate}`;
     if (travelTime) url += `&time=${travelTime}`;
     return url;
@@ -579,9 +579,9 @@ function getOtpPlanUrl(startCoord, endCoord, otpMode, travelDate, travelTime) {
 async function fetchOtpTransitRoute(startLocCoords, endLocCoords, travelDate, travelTime) {
     try {
         const isJapan = (startLocCoords.lat > 20);
-        const port = isJapan ? 8080 : 8081;
+        const proxyPath = isJapan ? "otp-japan" : "otp-malaysia";
         const router = isJapan ? "japan" : "malaysia";
-        let url = `http://129.225.135.42:${port}/otp/routers/${router}/plan?fromPlace=${startLocCoords.lat},${startLocCoords.lon}&toPlace=${endLocCoords.lat},${endLocCoords.lon}&mode=TRANSIT,WALK&maxWalkDistance=5000&walkReluctance=5&maxTransfers=8`;
+        let url = `https://roamready-otp.duckdns.org/${proxyPath}/routers/${router}/plan?fromPlace=${startLocCoords.lat},${startLocCoords.lon}&toPlace=${endLocCoords.lat},${endLocCoords.lon}&mode=TRANSIT,WALK&maxWalkDistance=5000&walkReluctance=5&maxTransfers=8`;
         if (travelDate) url += `&date=${travelDate}`;
         if (travelTime) url += `&time=${travelTime}`;
         const hasAbort = (typeof AbortController !== 'undefined');
@@ -3781,9 +3781,10 @@ if (typeof document !== 'undefined') {
         async function loadStationsFromOtp() {
             if (typeof fetch === 'undefined') return;
             try {
-                const port = state.destination === "japan" ? 8080 : 8081;
-                const router = state.destination === "japan" ? "japan" : "malaysia";
-                const res = await fetch(`http://129.225.135.42:${port}/otp/routers/${router}/index/stops`);
+                const isJapan = (state.destination === "japan");
+                const proxyPath = isJapan ? "otp-japan" : "otp-malaysia";
+                const router = isJapan ? "japan" : "malaysia";
+                const res = await fetch(`https://roamready-otp.duckdns.org/${proxyPath}/routers/${router}/index/stops`);
                 if (!res.ok) return;
                 const stops = await res.json();
                 if (Array.isArray(stops) && stops.length > 0) {
