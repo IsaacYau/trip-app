@@ -570,7 +570,7 @@ function getOtpPlanUrl(startCoord, endCoord, otpMode, travelDate, travelTime) {
     const isJapan = (startCoord.lat > 20);
     const port = isJapan ? 8080 : 8081;
     const router = isJapan ? "japan" : "malaysia";
-    let url = `http://150.230.3.107:${port}/otp/routers/${router}/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`;
+    let url = `http://129.225.135.42:${port}/otp/routers/${router}/plan?fromPlace=${startCoord.lat},${startCoord.lon}&toPlace=${endCoord.lat},${endCoord.lon}&mode=${otpMode}`;
     if (travelDate) url += `&date=${travelDate}`;
     if (travelTime) url += `&time=${travelTime}`;
     return url;
@@ -581,14 +581,25 @@ async function fetchOtpTransitRoute(startLocCoords, endLocCoords, travelDate, tr
         const isJapan = (startLocCoords.lat > 20);
         const port = isJapan ? 8080 : 8081;
         const router = isJapan ? "japan" : "malaysia";
-        let url = `http://150.230.3.107:${port}/otp/routers/${router}/plan?fromPlace=${startLocCoords.lat},${startLocCoords.lon}&toPlace=${endLocCoords.lat},${endLocCoords.lon}&mode=TRANSIT,WALK`;
+        let url = `http://129.225.135.42:${port}/otp/routers/${router}/plan?fromPlace=${startLocCoords.lat},${startLocCoords.lon}&toPlace=${endLocCoords.lat},${endLocCoords.lon}&mode=TRANSIT,WALK&maxWalkDistance=5000&walkReluctance=5&maxTransfers=8`;
         if (travelDate) url += `&date=${travelDate}`;
         if (travelTime) url += `&time=${travelTime}`;
-        const response = await fetch(url);
+        const hasAbort = (typeof AbortController !== 'undefined');
+        const controller = hasAbort ? new AbortController() : null;
+        if (controller && typeof activeRoutingAbortControllers !== 'undefined') {
+            activeRoutingAbortControllers.push(controller);
+        }
+        const timeoutMs = isJapan ? 60000 : 25000;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+        const fetchOpts = controller ? { signal: controller.signal } : {};
+        const response = await fetch(url, fetchOpts);
+        if (timeoutId) clearTimeout(timeoutId);
         if (!response.ok) return null;
         const data = await response.json();
         if (data.plan && data.plan.itineraries && data.plan.itineraries.length > 0) {
-            const itin = data.plan.itineraries[0];
+            const itin = data.plan.itineraries.find(it => it.legs.some(leg => leg.transitLeg));
+            if (!itin) return null;
             const fare = isJapan ? calculateJapanTransitFare(itin) : calculateMalaysiaTransitFare(itin);
             const segmentLinks = [];
             let transfers = 0;
@@ -661,10 +672,23 @@ function decodePolyline(str) {
     return coordinates;
 }
 
+function getHaversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
 // OSRM Routing service (100% Free for walking/cycling/driving)
 async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
     if (!startCoord || !endCoord) return null;
     const isTestEnv = (typeof state === 'undefined');
+    
+    if (mode === "foot" || mode === "bicycle") {
+        const dist = getHaversineDistance(startCoord.lat, startCoord.lon, endCoord.lat, endCoord.lon);
+        if (dist > 80) return null;
+    }
     
     async function queryUrl(url) {
         const hasAbort = (typeof AbortController !== 'undefined');
@@ -672,7 +696,9 @@ async function fetchOsrmRoute(startCoord, endCoord, mode = "foot") {
         if (controller && typeof activeRoutingAbortControllers !== 'undefined') {
             activeRoutingAbortControllers.push(controller);
         }
-        const timeoutId = controller ? setTimeout(() => controller.abort(), 25000) : null;
+        const isJapan = (startCoord && startCoord.lat > 20);
+        const timeoutMs = isJapan ? 60000 : 25000;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
         try {
             const fetchOpts = controller ? { signal: controller.signal } : {};
             const response = await fetch(url, fetchOpts);
@@ -3757,7 +3783,7 @@ if (typeof document !== 'undefined') {
             try {
                 const port = state.destination === "japan" ? 8080 : 8081;
                 const router = state.destination === "japan" ? "japan" : "malaysia";
-                const res = await fetch(`http://150.230.3.107:${port}/otp/routers/${router}/index/stops`);
+                const res = await fetch(`http://129.225.135.42:${port}/otp/routers/${router}/index/stops`);
                 if (!res.ok) return;
                 const stops = await res.json();
                 if (Array.isArray(stops) && stops.length > 0) {
@@ -3765,6 +3791,12 @@ if (typeof document !== 'undefined') {
                     const nodes = [];
                     stops.forEach(stop => {
                         if (stop.name && stop.lat && stop.lon) {
+                            if (state.destination === "japan") {
+                                const lat = stop.lat;
+                                const lon = stop.lon;
+                                const inRegion = (lat >= 34.2 && lat <= 35.4 && lon >= 134.8 && lon <= 137.2);
+                                if (!inRegion) return;
+                            }
                             coords[stop.name] = { lat: stop.lat, lon: stop.lon };
                             nodes.push(stop.name);
                         }
@@ -4111,6 +4143,32 @@ if (typeof document !== 'undefined') {
                     transitTransfers = 0;
                 } else {
                     transitTimelineHtml = `<div class="route-timeline">`;
+                    
+                    const distBetween = getHaversineDistance(startLocCoords.lat, startLocCoords.lon, endLocCoords.lat, endLocCoords.lon);
+                    if (distBetween > 35) {
+                        if (state.destination === "japan") {
+                            transitTimelineHtml += `
+                                <div style="background: rgba(229, 62, 94, 0.1); border: 1px solid var(--accent); padding: 0.8rem 1rem; border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; backdrop-filter: blur(8px); text-align: left;">
+                                    <span style="font-size: 1.5rem;">🚄</span>
+                                    <div style="text-align: left;">
+                                        <p style="font-weight: 750; margin: 0 0 0.15rem 0; color: var(--accent);">Inter-City Route Detected</p>
+                                        <p style="color: var(--text-secondary); margin: 0; line-height: 1.35;">For fast travel between Nagoya and Osaka/Kobe, please check the <strong>Tokaido Shinkansen (Bullet Train)</strong> schedules.</p>
+                                    </div>
+                                </div>
+                            `;
+                        } else if (state.destination === "malaysia") {
+                            transitTimelineHtml += `
+                                <div style="background: rgba(49, 130, 206, 0.1); border: 1px solid var(--primary); padding: 0.8rem 1rem; border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; backdrop-filter: blur(8px); text-align: left;">
+                                    <span style="font-size: 1.5rem;">🚌</span>
+                                    <div style="text-align: left;">
+                                        <p style="font-weight: 750; margin: 0 0 0.15rem 0; color: var(--primary);">Inter-City Route Detected</p>
+                                        <p style="color: var(--text-secondary); margin: 0; line-height: 1.35;">For cross-city travel (e.g. KL ➔ Penang), please check the <strong>KTM ETS Train</strong> or long-distance bus schedules.</p>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+                    
                     let currentMins = 0;
                     
                     transitTimelineHtml += `

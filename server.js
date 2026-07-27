@@ -61,7 +61,7 @@ const server = http.createServer(async (req, res) => {
         if (mode === "bicycle") otpMode = "BICYCLE";
         else if (mode === "driving") otpMode = "CAR";
 
-        const targetUrl = `http://150.230.3.107:8080/otp/routers/default/plan?fromPlace=${startLat},${startLon}&toPlace=${endLat},${endLon}&mode=${otpMode}`;
+        const targetUrl = `http://129.225.135.42:8080/otp/routers/default/plan?fromPlace=${startLat},${startLon}&toPlace=${endLat},${endLon}&mode=${otpMode}`;
 
         try {
             const result = await fetchExternal(targetUrl);
